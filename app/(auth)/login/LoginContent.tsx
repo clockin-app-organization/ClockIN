@@ -4,10 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BarChart3, Loader2, AlertCircle, Eye, EyeOff, ArrowLeft } from "lucide-react";
 
-// Three distinct steps — only ONE renders at a time
 type Step = "email" | "password" | "set-password";
 
-export default function LoginPage() {
+export default function LoginContent() {
   const router   = useRouter();
   const params   = useSearchParams();
   const supabase = createClient();
@@ -29,7 +28,7 @@ export default function LoginPage() {
     setShowPw(false);
   }
 
-  // ── Step 1: verify email is pre-approved, then detect if first login ──
+  // ── Step 1: verify email is pre-approved ──
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setLoading(true);
@@ -44,24 +43,20 @@ export default function LoginPage() {
       return;
     }
 
-    // Probe: does this user already have an auth account?
     const { error: probeErr } = await supabase.auth.signInWithPassword({
       email: email.toLowerCase().trim(),
       password: "__probe__",
     });
 
-    // "Invalid login credentials" means the auth account EXISTS (wrong pw probe)
-    // Anything else (e.g. "Email not confirmed") means no auth account yet
     if (probeErr?.message?.includes("Invalid login credentials")) {
-      setStep("password");       // returning user — enter their real password
+      setStep("password");
     } else {
-      setStep("set-password");   // first login — create password
+      setStep("set-password");
     }
-
     setLoading(false);
   }
 
-  // ── Step 2a: returning user sign in ──────────────────────────
+  // ── Step 2a: returning user sign in ──
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setLoading(true);
@@ -76,12 +71,11 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-
     router.refresh();
     router.push("/dashboard");
   }
 
-  // ── Step 2b: first login — create account + sign in ──────────
+  // ── Step 2b: first login ──
   async function handleSetPassword(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -90,7 +84,6 @@ export default function LoginPage() {
     if (password !== confirm)  { setError("Passwords do not match."); return; }
 
     setLoading(true);
-
     const { error: signUpErr } = await supabase.auth.signUp({
       email: email.toLowerCase().trim(),
       password,
@@ -107,12 +100,10 @@ export default function LoginPage() {
       email: email.toLowerCase().trim(),
       password,
     });
-
     router.refresh();
-    router.push("/dashboard"); // middleware sends first-timers → /onboarding
+    router.push("/dashboard");
   }
 
-  // Inline eye toggle button (repeated in both password fields)
   const eyeButton = (
     <button
       type="button"
@@ -126,8 +117,6 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 px-4">
       <div className="w-full max-w-sm">
-
-        {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-200">
             <BarChart3 className="h-7 w-7 text-white" />
@@ -138,7 +127,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Inactive banner */}
         {reason === "inactive" && (
           <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
@@ -147,8 +135,6 @@ export default function LoginPage() {
         )}
 
         <div className="card p-6">
-
-          {/* ── STEP 1: Email ── */}
           {step === "email" && (
             <>
               <h2 className="mb-1 text-base font-semibold text-gray-900">Sign in</h2>
@@ -176,14 +162,9 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* ── STEP 2a: Returning user — enter password ── */}
           {step === "password" && (
             <>
-              <button
-                type="button"
-                onClick={resetToEmail}
-                className="mb-4 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={resetToEmail} className="mb-4 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
                 <ArrowLeft className="h-3.5 w-3.5" /> Back
               </button>
               <h2 className="mb-1 text-base font-semibold text-gray-900">Welcome back</h2>
@@ -214,14 +195,9 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* ── STEP 2b: First login — create password ── */}
           {step === "set-password" && (
             <>
-              <button
-                type="button"
-                onClick={resetToEmail}
-                className="mb-4 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={resetToEmail} className="mb-4 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
                 <ArrowLeft className="h-3.5 w-3.5" /> Back
               </button>
               <h2 className="mb-1 text-base font-semibold text-gray-900">Create your password</h2>
@@ -264,7 +240,6 @@ export default function LoginPage() {
               </form>
             </>
           )}
-
         </div>
 
         <p className="mt-6 text-center text-xs text-gray-400">
@@ -272,14 +247,5 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
-  );
-}import { Suspense } from "react";
-import LoginContent from "./LoginContent";
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><p>Loading...</p></div>}>
-      <LoginContent />
-    </Suspense>
   );
 }
