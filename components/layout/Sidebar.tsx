@@ -1,0 +1,135 @@
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import {
+  LayoutDashboard, Calendar, ClipboardList, Archive,
+  Users, X, Menu, BarChart3, LogOut
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import type { Profile } from "@/lib/types";
+
+const nav = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Events",    href: "/events",    icon: Calendar },
+  { label: "Sessions",  href: "/sessions",  icon: ClipboardList },
+  { label: "Archives",  href: "/archives",  icon: Archive },
+  { label: "Profiles",  href: "/profiles",  icon: Users },
+];
+
+export default function Sidebar({ profile }: { profile: Profile }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  const SidebarContent = () => (
+    <div className="flex h-full flex-col">
+      {/* Brand */}
+      <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-4">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600">
+          <BarChart3 className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-900 leading-tight">Smart Attendance</p>
+          <p className="text-[11px] text-gray-400">
+            {profile.is_super_admin ? "Super Admin" : "Admin"}
+          </p>
+        </div>
+        <button
+          onClick={() => setOpen(false)}
+          className="ml-auto rounded-lg p-1 hover:bg-gray-100 lg:hidden"
+        >
+          <X className="h-4 w-4 text-gray-400" />
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 space-y-0.5 px-3 py-3">
+        {nav.map(({ label, href, icon: Icon }) => {
+          const active = pathname === href || pathname.startsWith(href + "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setOpen(false)}
+              className={cn(
+                "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                active
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              )}
+            >
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* User + Logout */}
+      <div className="border-t border-gray-100 p-3">
+        <div className="mb-2 flex items-center gap-2.5 rounded-xl bg-gray-50 px-3 py-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-600 flex-shrink-0">
+            {(profile.full_name || profile.email)[0].toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-gray-900">
+              {profile.full_name || "Admin"}
+            </p>
+            <p className="truncate text-[10px] text-gray-400">{profile.email}</p>
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-50"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Mobile menu button */}
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed left-4 top-4 z-40 flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white shadow-sm lg:hidden"
+      >
+        <Menu className="h-4 w-4 text-gray-600" />
+      </button>
+
+      {/* Mobile overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-60 border-r border-gray-200 bg-white transition-transform duration-200 lg:hidden",
+          open ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <SidebarContent />
+      </aside>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden w-60 flex-shrink-0 border-r border-gray-200 bg-white lg:flex lg:flex-col">
+        <SidebarContent />
+      </aside>
+    </>
+  );
+}
