@@ -1,3 +1,4 @@
+// hooks/useEvent.ts
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -19,7 +20,13 @@ export function useEvent(eventId: string) {
     setLoading(false);
   }, [eventId]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => {
+    const loadEvent = async () => {
+      await fetch();
+    };
+
+    void loadEvent();
+  }, [fetch]);
 
   return { event, loading, refetch: fetch };
 }

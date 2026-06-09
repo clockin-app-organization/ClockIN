@@ -1,0 +1,128 @@
+// app/(admin)/archive/page.tsx
+import { createClient } from "@/lib/supabase/server";
+import { getProfile }   from "@/lib/supabase/server";
+import { redirect }     from "next/navigation";
+import Link             from "next/link";
+import { Archive, FolderOpen, RotateCcw } from "lucide-react";
+import { formatDate }   from "@/lib/utils";
+import type { Event, Session } from "@/lib/types";
+
+export const revalidate = 0;
+
+export default async function ArchivePage() {
+  const profile = await getProfile();
+  if (!profile) redirect("/login");
+
+  const supabase = await createClient();
+
+  const [{ data: events }, { data: sessions }] = await Promise.all([
+    supabase
+      .from("events")
+      .select("*")
+      .eq("status", "archived")
+      .order("archived_at", { ascending: false }),
+    supabase
+      .from("sessions")
+      .select("*, event:events(id,name)")
+      .eq("status", "archived")
+      .order("archived_at", { ascending: false }),
+  ]);
+
+  const totalArchived = (events?.length ?? 0) + (sessions?.length ?? 0);
+
+  return (
+    <div className="space-y-6 p-4 lg:p-6">
+
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50">
+          <Archive className="h-5 w-5 text-purple-600" />
+        </div>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Archive</h1>
+          <p className="text-sm text-gray-500">{totalArchived} archived item{totalArchived !== 1 ? "s" : ""}</p>
+        </div>
+      </div>
+
+      {totalArchived === 0 && (
+        <div className="card flex flex-col items-center gap-3 py-16 text-center">
+          <FolderOpen className="h-10 w-10 text-gray-300" />
+          <p className="font-medium text-gray-500">Nothing archived yet</p>
+          <p className="text-sm text-gray-400">Events and sessions are archived automatically at midnight.</p>
+        </div>
+      )}
+
+      {/* Archived events */}
+      {events && events.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Events</h2>
+          <div className="card overflow-hidden">
+            <div className="divide-y divide-gray-50">
+              {events.map((e: Event) => (
+                <div key={e.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-gray-900">{e.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {e.location} · {formatDate(e.event_date)}
+                      {e.archived_at && ` · Archived ${formatDate(e.archived_at)}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Link
+                      href={`/events/${e.id}`}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      View
+                    </Link>
+                    <Link
+                      href={`/events/${e.id}/revive`}
+                      className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Revive
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Archived sessions */}
+      {sessions && sessions.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Sessions</h2>
+          <div className="card overflow-hidden">
+            <div className="divide-y divide-gray-50">
+              {sessions.map((s: Session & { event: { id: string; name: string } }) => (
+                <div key={s.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-gray-900">{s.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {s.event?.name}
+                      {s.archived_at && ` · Archived ${formatDate(s.archived_at)}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Link
+                      href={`/events/${s.event_id}/sessions/${s.id}`}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      View
+                    </Link>
+                    <Link
+                      href={`/events/${s.event_id}/sessions/${s.id}/revive`}
+                      className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Revive
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

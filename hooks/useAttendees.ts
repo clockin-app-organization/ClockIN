@@ -1,3 +1,4 @@
+// hooks/useAttendees.ts
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -19,7 +20,7 @@ export function useAttendees(eventId?: string, sessionId?: string) {
   }, [eventId, sessionId]);
 
   useEffect(() => {
-    fetch();
+    Promise.resolve().then(fetch);
 
     // Realtime subscription
     const channel = supabase.channel("attendees-realtime")

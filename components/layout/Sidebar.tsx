@@ -1,3 +1,4 @@
+// components/layout/Sidebar.tsx
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -30,7 +31,8 @@ export default function Sidebar({ profile }: { profile: Profile }) {
     router.push("/login");
   };
 
-  const SidebarContent = () => (
+  // Regular function that returns JSX, NOT a React component
+  const renderSidebarContent = () => (
     <div className="flex h-full flex-col">
       {/* Brand */}
       <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-4">
@@ -123,12 +125,12 @@ export default function Sidebar({ profile }: { profile: Profile }) {
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <SidebarContent />
+        {renderSidebarContent()}
       </aside>
 
       {/* Desktop sidebar */}
       <aside className="hidden w-60 flex-shrink-0 border-r border-gray-200 bg-white lg:flex lg:flex-col">
-        <SidebarContent />
+        {renderSidebarContent()}
       </aside>
     </>
   );

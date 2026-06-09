@@ -2,78 +2,126 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BarChart3, Loader2, AlertCircle } from "lucide-react";
+import { BarChart3, Loader2, AlertCircle, Eye, EyeOff, ArrowLeft } from "lucide-react";
+
+// Three distinct steps — only ONE renders at a time
+type Step = "email" | "password" | "set-password";
 
 export default function LoginPage() {
-  const router      = useRouter();
-  const params      = useSearchParams();
-  const supabase    = createClient();
+  const router   = useRouter();
+  const params   = useSearchParams();
+  const supabase = createClient();
+  const reason   = params.get("reason");
 
+  const [step,     setStep]     = useState<Step>("email");
   const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm,  setConfirm]  = useState("");
+  const [showPw,   setShowPw]   = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
-  const [otpSent,  setOtpSent]  = useState(false);
-  const [otp,      setOtp]      = useState("");
 
-  const reason = params.get("reason");
+  function resetToEmail() {
+    setStep("email");
+    setPassword("");
+    setConfirm("");
+    setError("");
+    setShowPw(false);
+  }
 
-  async function handleSendOtp(e: React.FormEvent) {
+  // ── Step 1: verify email is pre-approved, then detect if first login ──
+  async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setLoading(true);
 
-    // Check if this email was pre-added by super admin
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, is_first_login, is_active")
-      .eq("email", email.toLowerCase().trim())
-      .maybeSingle();
-
-    if (profile && !profile.is_active) {
-      setError("Your account has been deactivated. Contact your administrator.");
-      setLoading(false);
-      return;
-    }
-
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: email.toLowerCase().trim(),
-      options: { shouldCreateUser: !!profile }, // only create if pre-added
+    const { data: approved } = await supabase.rpc("is_email_pre_approved", {
+      p_email: email.toLowerCase().trim(),
     });
 
-    if (otpError) {
-      // Email not registered and not pre-added
-      if (otpError.message.includes("Signups not allowed")) {
-        setError("This email is not registered. Contact your administrator.");
-      } else {
-        setError(otpError.message);
-      }
+    if (!approved) {
+      setError("This email is not registered. Contact your administrator.");
       setLoading(false);
       return;
     }
 
-    setOtpSent(true);
+    // Probe: does this user already have an auth account?
+    const { error: probeErr } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase().trim(),
+      password: "__probe__",
+    });
+
+    // "Invalid login credentials" means the auth account EXISTS (wrong pw probe)
+    // Anything else (e.g. "Email not confirmed") means no auth account yet
+    if (probeErr?.message?.includes("Invalid login credentials")) {
+      setStep("password");       // returning user — enter their real password
+    } else {
+      setStep("set-password");   // first login — create password
+    }
+
     setLoading(false);
   }
 
-  async function handleVerifyOtp(e: React.FormEvent) {
+  // ── Step 2a: returning user sign in ──────────────────────────
+  async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setLoading(true);
 
-    const { error: verifyError } = await supabase.auth.verifyOtp({
+    const { error: err } = await supabase.auth.signInWithPassword({
       email: email.toLowerCase().trim(),
-      token: otp.trim(),
-      type: "email",
+      password,
     });
 
-    if (verifyError) {
-      setError("Invalid or expired code. Please try again.");
+    if (err) {
+      setError("Incorrect password. Please try again.");
       setLoading(false);
       return;
     }
 
-    // Middleware will handle first-login → onboarding redirect
     router.refresh();
     router.push("/dashboard");
   }
+
+  // ── Step 2b: first login — create account + sign in ──────────
+  async function handleSetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (password !== confirm)  { setError("Passwords do not match."); return; }
+
+    setLoading(true);
+
+    const { error: signUpErr } = await supabase.auth.signUp({
+      email: email.toLowerCase().trim(),
+      password,
+      options: { emailRedirectTo: undefined },
+    });
+
+    if (signUpErr) {
+      setError(signUpErr.message);
+      setLoading(false);
+      return;
+    }
+
+    await supabase.auth.signInWithPassword({
+      email: email.toLowerCase().trim(),
+      password,
+    });
+
+    router.refresh();
+    router.push("/dashboard"); // middleware sends first-timers → /onboarding
+  }
+
+  // Inline eye toggle button (repeated in both password fields)
+  const eyeButton = (
+    <button
+      type="button"
+      onClick={() => setShowPw(v => !v)}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+    >
+      {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+    </button>
+  );
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 px-4">
@@ -90,82 +138,133 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Inactive notice */}
+        {/* Inactive banner */}
         {reason === "inactive" && (
           <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-            Your account has been deactivated.
+            Your account has been deactivated. Contact your administrator.
           </div>
         )}
 
         <div className="card p-6">
-          {!otpSent ? (
+
+          {/* ── STEP 1: Email ── */}
+          {step === "email" && (
             <>
               <h2 className="mb-1 text-base font-semibold text-gray-900">Sign in</h2>
-              <p className="mb-5 text-sm text-gray-500">
-                We&apos;ll send a one-time code to your email.
-              </p>
-              <form onSubmit={handleSendOtp} className="space-y-4">
+              <p className="mb-5 text-sm text-gray-500">Enter your email to continue.</p>
+              <form onSubmit={handleEmailSubmit} className="space-y-4">
                 <div>
                   <label className="label">Email address</label>
                   <input
-                    type="email"
-                    required
+                    type="email" required autoFocus
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
+                    onChange={e => { setEmail(e.target.value); setError(""); }}
+                    placeholder="you@moe.gov.sl"
                     className="input-base"
                   />
                 </div>
                 {error && (
                   <p className="flex items-center gap-1.5 text-xs text-red-600">
-                    <AlertCircle className="h-3.5 w-3.5" /> {error}
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{error}
                   </p>
                 )}
                 <button type="submit" disabled={loading} className="btn-primary w-full">
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send code"}
-                </button>
-              </form>
-            </>
-          ) : (
-            <>
-              <h2 className="mb-1 text-base font-semibold text-gray-900">Enter your code</h2>
-              <p className="mb-5 text-sm text-gray-500">
-                Sent to <span className="font-medium text-gray-700">{email}</span>
-              </p>
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div>
-                  <label className="label">One-time code</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    required
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    placeholder="123456"
-                    className="input-base tracking-[0.3em] text-center text-lg"
-                    autoFocus
-                  />
-                </div>
-                {error && (
-                  <p className="flex items-center gap-1.5 text-xs text-red-600">
-                    <AlertCircle className="h-3.5 w-3.5" /> {error}
-                  </p>
-                )}
-                <button type="submit" disabled={loading} className="btn-primary w-full">
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & sign in"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setOtpSent(false); setOtp(""); setError(""); }}
-                  className="w-full text-center text-xs text-gray-400 hover:text-gray-600"
-                >
-                  Use a different email
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue"}
                 </button>
               </form>
             </>
           )}
+
+          {/* ── STEP 2a: Returning user — enter password ── */}
+          {step === "password" && (
+            <>
+              <button
+                type="button"
+                onClick={resetToEmail}
+                className="mb-4 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> Back
+              </button>
+              <h2 className="mb-1 text-base font-semibold text-gray-900">Welcome back</h2>
+              <p className="mb-5 truncate text-sm text-gray-500">{email}</p>
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div>
+                  <label className="label">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPw ? "text" : "password"} required autoFocus
+                      value={password}
+                      onChange={e => { setPassword(e.target.value); setError(""); }}
+                      placeholder="••••••••"
+                      className="input-base pr-10"
+                    />
+                    {eyeButton}
+                  </div>
+                </div>
+                {error && (
+                  <p className="flex items-center gap-1.5 text-xs text-red-600">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{error}
+                  </p>
+                )}
+                <button type="submit" disabled={loading} className="btn-primary w-full">
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* ── STEP 2b: First login — create password ── */}
+          {step === "set-password" && (
+            <>
+              <button
+                type="button"
+                onClick={resetToEmail}
+                className="mb-4 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> Back
+              </button>
+              <h2 className="mb-1 text-base font-semibold text-gray-900">Create your password</h2>
+              <p className="mb-5 text-sm text-gray-500">
+                First login for <span className="font-medium text-gray-700">{email}</span>.
+                Set a password to secure your account.
+              </p>
+              <form onSubmit={handleSetPassword} className="space-y-4">
+                <div>
+                  <label className="label">New password</label>
+                  <div className="relative">
+                    <input
+                      type={showPw ? "text" : "password"} required autoFocus
+                      value={password}
+                      onChange={e => { setPassword(e.target.value); setError(""); }}
+                      placeholder="Min. 8 characters"
+                      className="input-base pr-10"
+                    />
+                    {eyeButton}
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Confirm password</label>
+                  <input
+                    type={showPw ? "text" : "password"} required
+                    value={confirm}
+                    onChange={e => { setConfirm(e.target.value); setError(""); }}
+                    placeholder="Re-enter password"
+                    className="input-base"
+                  />
+                </div>
+                {error && (
+                  <p className="flex items-center gap-1.5 text-xs text-red-600">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{error}
+                  </p>
+                )}
+                <button type="submit" disabled={loading} className="btn-primary w-full">
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Set password & continue"}
+                </button>
+              </form>
+            </>
+          )}
+
         </div>
 
         <p className="mt-6 text-center text-xs text-gray-400">

@@ -1,13 +1,14 @@
-/** @type {import('next').NextConfig} */
-const withPWA = require("next-pwa")({
-  dest: "public",
-  disable: process.env.NODE_ENV === "development",
-  register: true,
-  skipWaiting: true,
-});
+import type { NextConfig } from "next";
 
-const nextConfig = {
-  images: { domains: ["*.supabase.co"] },
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+      },
+    ],
+  },
 };
 
-module.exports = withPWA(nextConfig);
+export default nextConfig;

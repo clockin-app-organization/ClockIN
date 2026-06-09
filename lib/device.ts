@@ -1,3 +1,4 @@
+// lib/device.ts
 /**
  * Deterministic device fingerprint using available browser signals.
  * Stored in localStorage so repeat scans get auto-fill.
