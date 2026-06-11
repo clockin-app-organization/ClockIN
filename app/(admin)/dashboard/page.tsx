@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSession } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Calendar, Radio, CheckCircle2, AlertTriangle, Plus, FolderOpen } from "lucide-react";
+import { Calendar, Radio, CheckCircle2, AlertTriangle, Plus } from "lucide-react";
 import type { DashboardStats } from "@/lib/types";
 
 export const revalidate = 30;
@@ -26,10 +26,10 @@ export default async function DashboardPage() {
   };
 
   const statCards = [
-    { label: "Total events",      value: stats.total_events,    icon: Calendar,      color: "text-blue-600 bg-blue-50"   },
-    { label: "Active sessions",   value: stats.active_sessions, icon: Radio,         color: "text-green-600 bg-green-50" },
-    { label: "Total check-ins",   value: stats.total_checkins,  icon: CheckCircle2,  color: "text-indigo-600 bg-indigo-50"},
-    { label: "Flagged duplicates",value: stats.duplicates,      icon: AlertTriangle, color: "text-amber-600 bg-amber-50" },
+    { label: "Total events",      value: stats.total_events,    icon: Calendar,      color: "text-blue-600 bg-blue-50"    },
+    { label: "Active sessions",   value: stats.active_sessions, icon: Radio,         color: "text-green-600 bg-green-50"  },
+    { label: "Total check-ins",   value: stats.total_checkins,  icon: CheckCircle2,  color: "text-indigo-600 bg-indigo-50" },
+    { label: "Flagged duplicates",value: stats.duplicates,      icon: AlertTriangle, color: "text-amber-600 bg-amber-50"  },
   ];
 
   return (
@@ -39,7 +39,7 @@ export default async function DashboardPage() {
           <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
           <p className="mt-0.5 text-sm text-gray-500">Overview of your attendance system</p>
         </div>
-        <Link href="/events/new" className="btn-primary">
+        <Link href="/events/new" className="btn-primary flex items-center gap-1.5">
           <Plus className="h-4 w-4" /> New event
         </Link>
       </div>
@@ -61,33 +61,14 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Quick actions */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Link href="/events/new" className="card flex items-center gap-4 p-5 transition-shadow hover:shadow-md">
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-            <Calendar className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900">Create event</p>
-            <p className="text-sm text-gray-500">Set up an event with or without sessions</p>
-          </div>
-        </Link>
-        <Link href="/archive" className="card flex items-center gap-4 p-5 transition-shadow hover:shadow-md">
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-            <FolderOpen className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900">View archive</p>
-            <p className="text-sm text-gray-500">Browse past events and attendance data</p>
-          </div>
-        </Link>
-      </div>
-
       {/* Recent events */}
       {recentEvents && recentEvents.length > 0 && (
         <div className="card overflow-hidden">
-          <div className="border-b border-gray-100 px-5 py-3">
+          <div className="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">Recent events</h2>
+            <Link href="/events" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+              View all →
+            </Link>
           </div>
           <div className="divide-y divide-gray-50">
             {recentEvents.map(e => (
