@@ -39,6 +39,8 @@ export interface Event {
   // joined
   sessions?:    Session[];
   _attendee_count?: number;
+  revival_notes?:    RevivalNote[];        // ← add
+
 }
 
 // ── SESSION ──────────────────────────────────────────────────
@@ -56,6 +58,8 @@ export interface Session {
   // joined
   event?:      Pick<Event, "id" | "name" | "location" | "lat" | "lng">;
   _attendee_count?: number;
+  revival_notes?:     RevivalNote[];       // ← add
+
 }
 
 // ── ATTENDEE ─────────────────────────────────────────────────
@@ -75,6 +79,8 @@ export interface Attendee {
   lng:                number | null;
   location_label:     string | null;
   created_at:         string;
+  checked_in_after_revival: boolean;       // ← add
+
 }
 
 // ── QR TOKEN ─────────────────────────────────────────────────
