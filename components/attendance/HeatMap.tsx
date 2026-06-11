@@ -1,6 +1,7 @@
 // components/attendance/HeatMap.tsx
 'use client'
 import { useEffect, useRef } from 'react'
+import type { Map as LeafletMap } from 'leaflet'
 import type { Attendee } from '@/lib/types'
 import { clusterAttendees } from '@/lib/utils'
 
@@ -12,7 +13,7 @@ interface Props {
 
 export default function HeatMap({ attendees, centerLat, centerLng }: Props) {
   const mapRef         = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<unknown>(null)
+  const mapInstanceRef = useRef<LeafletMap | null>(null)
 
   useEffect(() => {
     if (!mapRef.current || typeof window === 'undefined') return
@@ -21,15 +22,18 @@ export default function HeatMap({ attendees, centerLat, centerLng }: Props) {
 
     // Tear down any existing instance before rebuilding
     if (mapInstanceRef.current) {
-      ;(mapInstanceRef.current as any).remove()
+      mapInstanceRef.current.remove()
       mapInstanceRef.current = null
     }
 
-    import('leaflet').then((L) => {
-      // Guard: cleanup already ran while we were importing
+    // ✅ FIX 1: Import Leaflet CSS alongside the module
+    Promise.all([
+      import('leaflet'),
+      import('leaflet/dist/leaflet.css' as string) as Promise<unknown>,
+    ]).then(([L]) => {
       if (cancelled || !mapRef.current) return
 
-      delete (L.Icon.Default.prototype as any)._getIconUrl
+      delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)['_getIconUrl']
       L.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
         iconUrl:       'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
@@ -47,6 +51,9 @@ export default function HeatMap({ attendees, centerLat, centerLng }: Props) {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(map)
+
+      // ✅ FIX 2: invalidateSize after mount so tiles fill the container
+      setTimeout(() => map.invalidateSize(), 100)
 
       if (!valid.length) return
 
@@ -86,11 +93,11 @@ export default function HeatMap({ attendees, centerLat, centerLng }: Props) {
     return () => {
       cancelled = true
       if (mapInstanceRef.current) {
-        ;(mapInstanceRef.current as any).remove()
+        mapInstanceRef.current.remove()
         mapInstanceRef.current = null
       }
     }
-  }, [attendees, centerLat, centerLng])  // re-runs when data changes — no separate effect needed
+  }, [attendees, centerLat, centerLng])
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-gray-200" style={{ height: 360 }}>

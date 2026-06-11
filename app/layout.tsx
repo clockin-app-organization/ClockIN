@@ -2,6 +2,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+// app/layout.tsx  — add this import at the top
+import 'leaflet/dist/leaflet.css'
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
