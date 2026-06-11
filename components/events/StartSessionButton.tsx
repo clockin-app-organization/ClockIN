@@ -1,3 +1,4 @@
+// components/events/StartSessionButton.tsx
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,22 +13,28 @@ export default function StartSessionButton({ sessionId }: { sessionId: string })
   async function start() {
     setLoading(true);
     const now = new Date().toISOString();
+
     await supabase
       .from("sessions")
       .update({ status: "active", started_at: now, updated_at: now })
       .eq("id", sessionId);
-    // Activate QR token
+
+    // Ensure QR token is active
     await supabase
       .from("qr_tokens")
       .update({ is_active: true })
       .eq("session_id", sessionId);
+
     setLoading(false);
     router.refresh();
   }
 
   return (
-    <button onClick={start} disabled={loading} className="btn-primary">
-      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+    <button onClick={start} disabled={loading} className="btn-primary flex items-center gap-2">
+      {loading
+        ? <Loader2 className="h-4 w-4 animate-spin" />
+        : <Play className="h-4 w-4" />
+      }
       Start session
     </button>
   );

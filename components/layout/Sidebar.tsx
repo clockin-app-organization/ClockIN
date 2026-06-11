@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  LayoutDashboard, Calendar, ClipboardList, Archive,
-  Users, X, Menu, BarChart3, LogOut
+  LayoutDashboard, Calendar, Archive,
+  Users, X, Menu, BarChart3, LogOut, ClipboardList,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -16,8 +16,8 @@ const nav = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Events",    href: "/events",    icon: Calendar },
   { label: "Sessions",  href: "/sessions",  icon: ClipboardList },
-  { label: "Archives",  href: "/archives",  icon: Archive },
-  { label: "Profiles",  href: "/profiles",  icon: Users },
+  { label: "Archive",   href: "/archive",   icon: Archive },
+  { label: "Users",     href: "/users",     icon: Users },
 ];
 
 export default function Sidebar({ profile }: { profile: Profile }) {
@@ -31,7 +31,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
     router.push("/login");
   };
 
-  // Regular function that returns JSX, NOT a React component
   const renderSidebarContent = () => (
     <div className="flex h-full flex-col">
       {/* Brand */}
@@ -56,6 +55,8 @@ export default function Sidebar({ profile }: { profile: Profile }) {
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 px-3 py-3">
         {nav.map(({ label, href, icon: Icon }) => {
+          // Active if exact match or starts with href + "/"
+          // Special case: /events should not activate on /events/new etc for sessions link
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link

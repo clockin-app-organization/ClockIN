@@ -1,3 +1,4 @@
+// app/(admin)/events/page.tsx
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Plus, Calendar } from "lucide-react";

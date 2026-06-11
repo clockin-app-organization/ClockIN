@@ -108,6 +108,7 @@ export interface AttendanceFormData {
 
 // ── TOKEN VALIDATION RESPONSE ────────────────────────────────
 export interface TokenPayload {
+  session_id: string;
   _token_type:    "event" | "session";
   id:             string;
   name:           string;

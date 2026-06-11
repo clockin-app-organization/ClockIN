@@ -1,17 +1,17 @@
 // app/(admin)/archive/page.tsx
 import { createClient } from "@/lib/supabase/server";
-import { getProfile }   from "@/lib/supabase/server";
 import { redirect }     from "next/navigation";
 import Link             from "next/link";
 import { Archive, FolderOpen, RotateCcw } from "lucide-react";
 import { formatDate }   from "@/lib/utils";
 import type { Event, Session } from "@/lib/types";
+import { getSession }   from "@/lib/supabase/server";
 
 export const revalidate = 0;
 
 export default async function ArchivePage() {
-  const profile = await getProfile();
-  if (!profile) redirect("/login");
+  const session = await getSession();
+  if (!session) redirect("/login");
 
   const supabase = await createClient();
 
@@ -40,7 +40,9 @@ export default async function ArchivePage() {
         </div>
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Archive</h1>
-          <p className="text-sm text-gray-500">{totalArchived} archived item{totalArchived !== 1 ? "s" : ""}</p>
+          <p className="text-sm text-gray-500">
+            {totalArchived} archived item{totalArchived !== 1 ? "s" : ""}
+          </p>
         </div>
       </div>
 
@@ -48,7 +50,9 @@ export default async function ArchivePage() {
         <div className="card flex flex-col items-center gap-3 py-16 text-center">
           <FolderOpen className="h-10 w-10 text-gray-300" />
           <p className="font-medium text-gray-500">Nothing archived yet</p>
-          <p className="text-sm text-gray-400">Events and sessions are archived automatically at midnight.</p>
+          <p className="text-sm text-gray-400">
+            Events and sessions are archived automatically at midnight.
+          </p>
         </div>
       )}
 
@@ -94,12 +98,12 @@ export default async function ArchivePage() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Sessions</h2>
           <div className="card overflow-hidden">
             <div className="divide-y divide-gray-50">
-              {sessions.map((s: Session & { event: { id: string; name: string } }) => (
+              {sessions.map((s: Session & { event: { id: string; name: string } | null }) => (
                 <div key={s.id} className="flex items-center justify-between gap-3 px-5 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-gray-900">{s.name}</p>
                     <p className="text-xs text-gray-400">
-                      {s.event?.name}
+                      {s.event?.name ?? "Unknown event"}
                       {s.archived_at && ` · Archived ${formatDate(s.archived_at)}`}
                     </p>
                   </div>

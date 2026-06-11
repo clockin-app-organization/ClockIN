@@ -1,3 +1,4 @@
+// app/(admin)/users/page.tsx
 import { createClient } from "@/lib/supabase/server";
 import { getSession } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";

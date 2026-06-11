@@ -1,3 +1,4 @@
+// app/(admin)/layout.tsx
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/supabase/server";
 import Sidebar from "@/components/layout/Sidebar";

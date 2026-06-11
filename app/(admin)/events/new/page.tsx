@@ -1,3 +1,4 @@
+// app/(admin)/events/new/page.tsx
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -25,6 +26,12 @@ export default function NewEventPage() {
     e.preventDefault()
     setError('')
 
+    // Validate end time is after start time
+    if (form.end_time && form.end_time <= form.start_time) {
+      setError('End time must be after start time.')
+      return
+    }
+
     if (hasSessions && !defaultSessionName.trim()) {
       setError('Please enter a name for the default session.')
       return
@@ -41,7 +48,7 @@ export default function NewEventPage() {
         description: form.description.trim() || null,
         event_date: form.event_date,
         start_time: form.start_time,
-        end_time: form.end_time || null,
+        end_time: form.end_time,
         has_sessions: hasSessions,
         qr_token: hasSessions ? null : token,
         created_by: user?.id,
@@ -49,14 +56,12 @@ export default function NewEventPage() {
 
       if (eventErr) throw eventErr
 
-      // Register QR token for no-session events
       if (!hasSessions) {
         await supabase.from('qr_tokens').insert({
           token, token_type: 'event', event_id: event.id, is_active: true,
         })
       }
 
-      // Create default session if sessions enabled
       if (hasSessions && defaultSessionName.trim()) {
         const sessionToken = generateToken()
         const { data: sess } = await supabase.from('sessions').insert({
@@ -82,8 +87,10 @@ export default function NewEventPage() {
     }
   }
 
+  const today = new Date().toISOString().split('T')[0]
+
   return (
-    <div className="mx-auto max-w-xl space-y-5">
+    <div className="mx-auto max-w-xl space-y-5 p-4 lg:p-6">
       <div className="flex items-center gap-3">
         <Link href="/events" className="btn-ghost p-2"><ChevronLeft className="h-4 w-4" /></Link>
         <h1 className="text-xl font-semibold">New event</h1>
@@ -102,24 +109,32 @@ export default function NewEventPage() {
         </div>
         <div>
           <label className="label">Description</label>
-          <textarea className="input-base" rows={2} placeholder="Optional description"
+          <textarea className="input-base resize-none" rows={2} placeholder="Optional description"
             value={form.description} onChange={e => set('description', e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="col-span-2 sm:col-span-1">
-            <label className="label">Date *</label>
-            <input required type="date" className="input-base" min={new Date().toISOString().split('T')[0]}
-              value={form.event_date} onChange={e => set('event_date', e.target.value)} />
-          </div>
+
+        <div>
+          <label className="label">Date *</label>
+          <input required type="date" className="input-base" min={today}
+            value={form.event_date} onChange={e => set('event_date', e.target.value)} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Start time *</label>
             <input required type="time" className="input-base"
               value={form.start_time} onChange={e => set('start_time', e.target.value)} />
           </div>
           <div>
-            <label className="label">End time</label>
-            <input type="time" className="input-base"
-              value={form.end_time} onChange={e => set('end_time', e.target.value)} />
+            <label className="label">End time *</label>
+            <input
+              required
+              type="time"
+              className="input-base"
+              min={form.start_time || undefined}
+              value={form.end_time}
+              onChange={e => set('end_time', e.target.value)}
+            />
           </div>
         </div>
 
@@ -130,13 +145,16 @@ export default function NewEventPage() {
               <p className="text-sm font-semibold text-gray-900">Enable sessions</p>
               <p className="text-xs text-gray-500 mt-0.5">Split into named segments (morning, afternoon…)</p>
             </div>
-            <button type="button" onClick={() => setHasSessions(v => !v)}
-              className={`relative h-6 w-11 rounded-full transition-colors ${hasSessions ? 'bg-indigo-600' : 'bg-gray-200'}`}>
+            <button
+              type="button"
+              onClick={() => setHasSessions(v => !v)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${hasSessions ? 'bg-indigo-600' : 'bg-gray-200'}`}
+            >
               <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${hasSessions ? 'translate-x-5' : ''}`} />
             </button>
           </div>
 
-          {hasSessions && (
+          {hasSessions ? (
             <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
               <p className="text-xs text-indigo-600 font-medium">
                 Sessions require manual start. A default session will be created automatically.
@@ -145,9 +163,7 @@ export default function NewEventPage() {
               <input className="input-base" placeholder="e.g. Morning Session, Opening Plenary"
                 value={defaultSessionName} onChange={e => setDefaultSessionName(e.target.value)} />
             </div>
-          )}
-
-          {!hasSessions && (
+          ) : (
             <p className="mt-2 text-xs text-gray-400">
               A single QR code is generated automatically. Attendees scan once and are recorded in a unified list.
             </p>
