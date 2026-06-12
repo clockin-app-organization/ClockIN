@@ -12,6 +12,8 @@ export default async function EventsPage() {
   const session  = await getSession();
   const supabase = await createClient();
 
+  await supabase.rpc('sync_event_statuses');
+
   // Check if current user is super admin
   const { data: profile } = await supabase
     .from("profiles")

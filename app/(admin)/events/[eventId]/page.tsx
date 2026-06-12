@@ -21,6 +21,8 @@ export default async function EventDetailPage({
   const { eventId } = await params;
   const supabase = await createClient();
 
+  await supabase.rpc('sync_event_statuses');
+
   const { data: event } = await supabase
     .from("events")
     .select("*, sessions(*)")
@@ -51,8 +53,8 @@ export default async function EventDetailPage({
   // Upcoming: admins can display/print it before the event starts
   // Active:   attendees scan it live
   const showQR = !event.has_sessions
-    && event.qr_token
-    && (event.status === "upcoming" || event.status === "active");
+  && event.qr_token
+  && event.status === "active";
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -130,19 +132,12 @@ export default async function EventDetailPage({
           {showQR && (
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="section-title">QR Code</h2>
-                {event.status === "upcoming" && (
-                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                    Ready — event not started yet
-                  </span>
-                )}
-                {event.status === "active" && (
-                  <span className="flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                    Live — accepting check-ins
-                  </span>
-                )}
-              </div>
+  <h2 className="section-title">QR Code</h2>
+  <span className="flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+    Live — accepting check-ins
+  </span>
+</div>
               <div className="flex justify-center">
                 <QRDisplay token={event.qr_token} label={`Scan to check in: ${event.name}`} />
               </div>

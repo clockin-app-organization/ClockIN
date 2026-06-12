@@ -81,73 +81,80 @@ export default function AttendPage() {
   }
 
   // ── Token validation (runs once on mount) ────────────────────────────────
-  useEffect(() => {
-    // Start location fetch in parallel — no setState called synchronously
-    if (!locStarted.current) {
-      locStarted.current = true
-      // Defer to next tick so we're not calling setState inside the effect body
-      setTimeout(startLocationRequest, 0)
+ useEffect(() => {
+  // Start location fetch in parallel — no setState called synchronously
+  if (!locStarted.current) {
+    locStarted.current = true;
+    setTimeout(startLocationRequest, 0);
+  }
+
+  let active = true;
+
+  // ⬇️ Run sync first, then validate
+  (async () => {
+    try {
+      await supabase.rpc('sync_event_statuses');
+    } catch (e) {
+      console.error('Failed to sync event statuses', e);
+    }
+    return supabase.rpc('validate_attendance_token', { p_token: token });
+  })().then(({ data, error }) => {
+    if (!active) return;
+
+    if (error || !data) {
+      setFatalError('This QR code is invalid or has expired.');
+      setPageState('error');
+      return;
     }
 
-    let active = true
+    const payload = data as TokenPayload;
+    setEventData(payload);
 
-    supabase.rpc('validate_attendance_token', { p_token: token }).then(({ data, error }) => {
-      if (!active) return
-
-      if (error || !data) {
-        setFatalError('This QR code is invalid or has expired.')
-        setPageState('error')
-        return
-      }
-
-      const payload = data as TokenPayload
-      setEventData(payload)
-
-      // Pre-fill from local cache
-      const cached = getCachedAttendee()
-      if (cached) {
-        setForm({
-          full_name:   cached.full_name   ?? '',
-          email:       cached.email       ?? '',
-          phone:       cached.phone       ?? '',
-          institution: cached.institution ?? '',
-          designation: cached.designation ?? '',
-        })
-      }
-
-      const scopeId = payload._token_type === 'session'
-        ? (payload.session_id ?? payload.id)
-        : payload.id
-
-      if (hasSubmittedForScope(scopeId)) {
-        setFatalError('You have already checked in for this event.')
-        setPageState('error')
-        return
-      }
-
-      // 5-minute countdown
-      setExpiry(300)
-      timerRef.current = setInterval(() => {
-        setExpiry(prev => {
-          if (!prev || prev <= 1) {
-            clearInterval(timerRef.current!)
-            setFatalError('QR session expired. Please scan again.')
-            setPageState('error')
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-
-      setPageState('form')
-    })
-
-    return () => {
-      active = false
-      if (timerRef.current) clearInterval(timerRef.current)
+    // Pre-fill from local cache
+    const cached = getCachedAttendee();
+    if (cached) {
+      setForm({
+        full_name:   cached.full_name   ?? '',
+        email:       cached.email       ?? '',
+        phone:       cached.phone       ?? '',
+        institution: cached.institution ?? '',
+        designation: cached.designation ?? '',
+      });
     }
+
+    const scopeId = payload._token_type === 'session'
+      ? (payload.session_id ?? payload.id)
+      : payload.id;
+
+    if (hasSubmittedForScope(scopeId)) {
+      setFatalError('You have already checked in for this event.');
+      setPageState('error');
+      return;
+    }
+
+    // 5-minute countdown
+    setExpiry(300);
+    timerRef.current = setInterval(() => {
+      setExpiry(prev => {
+        if (!prev || prev <= 1) {
+          clearInterval(timerRef.current!);
+          setFatalError('QR session expired. Please scan again.');
+          setPageState('error');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    setPageState('form');
+  });
+
+  return () => {
+    active = false;
+    if (timerRef.current) clearInterval(timerRef.current);
+  };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])   // token never changes; supabase is module-level stable
+}, [token]); // token never changes; supabase is stable
 
   // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {

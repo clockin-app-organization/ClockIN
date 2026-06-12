@@ -3,33 +3,100 @@ import { createClient } from "@/lib/supabase/server";
 import { getSession } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Calendar, Radio, CheckCircle2, AlertTriangle, Plus } from "lucide-react";
-import type { DashboardStats } from "@/lib/types";
+import type { DashboardStats, Event } from "@/lib/types";
 
 export const revalidate = 30;
 
+const empty = { count: 0 } as const;
+
+type RecentEvent = Pick<Event, "id" | "name" | "status" | "event_date" | "has_sessions">;
+
 export default async function DashboardPage() {
-  await getSession();
+  const session = await getSession();
   const supabase = await createClient();
+  const userId   = session!.user.id;
 
-  const [{ data: statsRow }, { data: recentEvents }] = await Promise.all([
-    supabase.from("dashboard_stats").select("*").single(),
-    supabase
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_super_admin")
+    .eq("id", userId)
+    .single();
+
+  const isSuperAdmin = profile?.is_super_admin ?? false;
+
+  let stats: DashboardStats;
+  let recentEvents: RecentEvent[] | null = null;
+
+  if (isSuperAdmin) {
+    const [{ data: statsRow }, { data: events }] = await Promise.all([
+      supabase.from("dashboard_stats").select("*").single(),
+      supabase
+        .from("events")
+        .select("id,name,status,event_date,has_sessions")
+        .neq("status", "archived")
+        .order("event_date", { ascending: false })
+        .limit(5),
+    ]);
+    stats        = statsRow ?? { total_events: 0, active_sessions: 0, total_checkins: 0, duplicates: 0 };
+    recentEvents = events as RecentEvent[] | null;
+  } else {
+    const { data: myEvents } = await supabase
       .from("events")
-      .select("id,name,status,event_date,has_sessions")
-      .neq("status", "archived")
-      .order("event_date", { ascending: false })
-      .limit(5),
-  ]);
+      .select("id")
+      .eq("created_by", userId);
 
-  const stats: DashboardStats = statsRow ?? {
-    total_events: 0, active_sessions: 0, total_checkins: 0, duplicates: 0,
-  };
+    const eventIds = (myEvents ?? []).map((e: { id: string }) => e.id);
+
+    const [
+      { count: totalEvents },
+      { count: activeSessions },
+      { count: totalCheckins },
+      { count: flagged },
+      { data: events },
+    ] = await Promise.all([
+      supabase
+        .from("events")
+        .select("*", { count: "exact", head: true })
+        .eq("created_by", userId)
+        .neq("status", "archived"),
+      eventIds.length
+        ? supabase
+            .from("sessions")
+            .select("*", { count: "exact", head: true })
+            .in("event_id", eventIds)
+            .eq("status", "active")
+        : Promise.resolve(empty),
+      eventIds.length
+        ? supabase
+            .from("attendance_records")
+            .select("*", { count: "exact", head: true })
+            .in("event_id", eventIds)
+        : Promise.resolve(empty),
+      eventIds.length
+        ? supabase
+            .from("attendance_records")
+            .select("*", { count: "exact", head: true })
+            .in("event_id", eventIds)
+            .eq("is_flagged", true)
+        : Promise.resolve(empty),
+      supabase
+        .from("events")
+        .select("id,name,status,event_date,has_sessions")
+        .eq("created_by", userId)
+        .neq("status", "archived")
+        .order("event_date", { ascending: false })
+        .limit(5),
+    ]);
+
+    stats        = { total_events: totalEvents ?? 0, active_sessions: activeSessions ?? 0, total_checkins: totalCheckins ?? 0, duplicates: flagged ?? 0 };
+    recentEvents = events as RecentEvent[] | null;
+  }
 
   const statCards = [
-    { label: "Total events",      value: stats.total_events,    icon: Calendar,      color: "text-blue-600 bg-blue-50"    },
-    { label: "Active sessions",   value: stats.active_sessions, icon: Radio,         color: "text-green-600 bg-green-50"  },
-    { label: "Total check-ins",   value: stats.total_checkins,  icon: CheckCircle2,  color: "text-indigo-600 bg-indigo-50" },
-    { label: "Flagged duplicates",value: stats.duplicates,      icon: AlertTriangle, color: "text-amber-600 bg-amber-50"  },
+    { label: "Total events",       value: stats.total_events,    icon: Calendar,      color: "text-blue-600 bg-blue-50"     },
+    { label: "Active sessions",    value: stats.active_sessions, icon: Radio,         color: "text-green-600 bg-green-50"   },
+    { label: "Total check-ins",    value: stats.total_checkins,  icon: CheckCircle2,  color: "text-indigo-600 bg-indigo-50" },
+    { label: "Flagged duplicates", value: stats.duplicates,      icon: AlertTriangle, color: "text-amber-600 bg-amber-50"   },
   ];
 
   return (
@@ -37,14 +104,15 @@ export default async function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Overview of your attendance system</p>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {isSuperAdmin ? "System-wide overview" : "Overview of your events"}
+          </p>
         </div>
         <Link href="/events/new" className="btn-primary flex items-center gap-1.5">
           <Plus className="h-4 w-4" /> New event
         </Link>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {statCards.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="card p-4">
@@ -61,7 +129,6 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Recent events */}
       {recentEvents && recentEvents.length > 0 && (
         <div className="card overflow-hidden">
           <div className="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -71,7 +138,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-gray-50">
-            {recentEvents.map(e => (
+            {recentEvents.map((e) => (
               <Link
                 key={e.id}
                 href={`/events/${e.id}`}
@@ -85,6 +152,14 @@ export default async function DashboardPage() {
               </Link>
             ))}
           </div>
+        </div>
+      )}
+
+      {recentEvents?.length === 0 && (
+        <div className="card flex flex-col items-center gap-3 py-16 text-center">
+          <Calendar className="h-10 w-10 text-gray-300" />
+          <p className="font-medium text-gray-500">No events yet</p>
+          <Link href="/events/new" className="btn-primary">Create your first event</Link>
         </div>
       )}
     </div>

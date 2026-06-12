@@ -5,26 +5,32 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   LayoutDashboard, Calendar, Archive,
-  Users, X, Menu, BarChart3, LogOut, ClipboardList,
+  Users, User, X, Menu, BarChart3, LogOut, ClipboardList,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
 
-const nav = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Events",    href: "/events",    icon: Calendar },
-  { label: "Sessions",  href: "/sessions",  icon: ClipboardList },
-  { label: "Archive",   href: "/archive",   icon: Archive },
-  { label: "Users",     href: "/users",     icon: Users },
-];
+function buildNav(isSuperAdmin: boolean) {
+  return [
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Events",    href: "/events",    icon: Calendar },
+    { label: "Sessions",  href: "/sessions",  icon: ClipboardList },
+    { label: "Archive",   href: "/archive",   icon: Archive },
+    isSuperAdmin
+      ? { label: "Users",   href: "/users",   icon: Users }
+      : { label: "Profile", href: "/profile", icon: User },
+  ];
+}
 
 export default function Sidebar({ profile }: { profile: Profile }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  const nav = buildNav(profile.is_super_admin ?? false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -55,8 +61,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 px-3 py-3">
         {nav.map(({ label, href, icon: Icon }) => {
-          // Active if exact match or starts with href + "/"
-          // Special case: /events should not activate on /events/new etc for sessions link
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -103,7 +107,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
 
   return (
     <>
-      {/* Mobile menu button */}
       <button
         onClick={() => setOpen(true)}
         className="fixed left-4 top-4 z-40 flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white shadow-sm lg:hidden"
@@ -111,7 +114,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         <Menu className="h-4 w-4 text-gray-600" />
       </button>
 
-      {/* Mobile overlay */}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-black/30 lg:hidden"
@@ -119,7 +121,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         />
       )}
 
-      {/* Mobile drawer */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-60 border-r border-gray-200 bg-white transition-transform duration-200 lg:hidden",
@@ -129,7 +130,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         {renderSidebarContent()}
       </aside>
 
-      {/* Desktop sidebar */}
       <aside className="hidden w-60 flex-shrink-0 border-r border-gray-200 bg-white lg:flex lg:flex-col">
         {renderSidebarContent()}
       </aside>
