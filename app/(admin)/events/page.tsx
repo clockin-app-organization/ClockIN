@@ -1,5 +1,7 @@
 // app/(admin)/events/page.tsx
+// Regular admins only see their own events; super admins see all.
 import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Plus, Calendar } from "lucide-react";
 import type { Event } from "@/lib/types";
@@ -7,18 +9,41 @@ import type { Event } from "@/lib/types";
 export const revalidate = 0;
 
 export default async function EventsPage() {
+  const session  = await getSession();
   const supabase = await createClient();
-  const { data: events } = await supabase
+
+  // Check if current user is super admin
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_super_admin")
+    .eq("id", session!.user.id)
+    .single();
+
+  const isSuperAdmin = profile?.is_super_admin ?? false;
+
+  // Super admins see all events; regular admins only see their own
+  let query = supabase
     .from("events")
     .select("*, sessions(count)")
     .neq("status", "archived")
     .order("event_date", { ascending: false });
 
+  if (!isSuperAdmin) {
+    query = query.eq("created_by", session!.user.id);
+  }
+
+  const { data: events } = await query;
+
   return (
     <div className="space-y-5 p-4 lg:p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">Events</h1>
-        <Link href="/events/new" className="btn-primary">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Events</h1>
+          {isSuperAdmin && (
+            <p className="text-xs text-gray-400 mt-0.5">Showing all events (super admin)</p>
+          )}
+        </div>
+        <Link href="/events/new" className="btn-primary flex items-center gap-1.5">
           <Plus className="h-4 w-4" /> New event
         </Link>
       </div>

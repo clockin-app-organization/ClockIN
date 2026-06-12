@@ -12,22 +12,29 @@ import {
 } from '@/lib/utils'
 import { validateAttendanceForm } from '@/lib/validation'
 import type { TokenPayload } from '@/lib/types'
-import { Camera, X, CheckCircle2, Loader2, Clock, MapPin } from 'lucide-react'
+import { X, CheckCircle2, Loader2, Clock, MapPin, AlertCircle, RefreshCw } from 'lucide-react'
+
+type LocState = 'requesting' | 'granted' | 'denied' | 'unsupported'
+
+// Supabase client is stable across renders — create once outside the component
+// so it never appears in dependency arrays.
+const supabase = createClient()
 
 export default function AttendPage() {
-  const params   = useParams()
-  const token    = params.token as string
-  const supabase = createClient()
+  const params = useParams()
+  const token  = params.token as string
 
-  const [eventData,  setEventData]  = useState<TokenPayload | null>(null)
-  const [pageState,  setPageState]  = useState<'loading' | 'form' | 'success' | 'error'>('loading')
-  const [fatalError, setFatalError] = useState('')
-  const [fieldError, setFieldError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [expiry,     setExpiry]     = useState<number | null>(null)
-  const [location,   setLocation]   = useState<{ lat: number; lng: number } | null>(null)
-  const [locLabel,   setLocLabel]   = useState<string>('')
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [eventData,   setEventData]   = useState<TokenPayload | null>(null)
+  const [pageState,   setPageState]   = useState<'loading' | 'form' | 'success' | 'error'>('loading')
+  const [fatalError,  setFatalError]  = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [submitting,  setSubmitting]  = useState(false)
+  const [expiry,      setExpiry]      = useState<number | null>(null)
+  const [location,    setLocation]    = useState<{ lat: number; lng: number } | null>(null)
+  const [locLabel,    setLocLabel]    = useState('')
+  const [locState,    setLocState]    = useState<LocState>('requesting')
+  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const locStarted = useRef(false)   // prevent double-firing in StrictMode
 
   const [form, setForm] = useState({
     full_name:   '',
@@ -37,10 +44,55 @@ export default function AttendPage() {
     designation: '',
   })
 
-  // ── 1. Validate token ─────────────────────────────────────────────────────
+  // ── Geolocation ───────────────────────────────────────────────────────────
+  // Not a useCallback — called imperatively so it never sits in a dep array.
+  function startLocationRequest() {
+    if (!navigator.geolocation) {
+      setLocState('unsupported')
+      return
+    }
+    setLocState('requesting')
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude: lat, longitude: lng } = pos.coords
+        setLocation({ lat, lng })
+        setLocState('granted')
+        fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        )
+          .then(r => r.json())
+          .then(d => {
+            const addr  = d.address ?? {}
+            const parts = [
+              addr.road ?? addr.suburb ?? addr.neighbourhood,
+              addr.city ?? addr.town   ?? addr.village,
+              addr.country,
+            ].filter(Boolean)
+            setLocLabel(parts.length ? parts.join(', ') : `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+          })
+          .catch(() => setLocLabel(`${lat.toFixed(5)}, ${lng.toFixed(5)}`))
+      },
+      err => {
+        console.warn('[location] error', err.code, err.message)
+        setLocState('denied')
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+    )
+  }
+
+  // ── Token validation (runs once on mount) ────────────────────────────────
   useEffect(() => {
-    ;(async () => {
-      const { data, error } = await supabase.rpc('validate_attendance_token', { p_token: token })
+    // Start location fetch in parallel — no setState called synchronously
+    if (!locStarted.current) {
+      locStarted.current = true
+      // Defer to next tick so we're not calling setState inside the effect body
+      setTimeout(startLocationRequest, 0)
+    }
+
+    let active = true
+
+    supabase.rpc('validate_attendance_token', { p_token: token }).then(({ data, error }) => {
+      if (!active) return
 
       if (error || !data) {
         setFatalError('This QR code is invalid or has expired.')
@@ -63,8 +115,6 @@ export default function AttendPage() {
         })
       }
 
-      // Check if already submitted for this scope
-      // For sessions the scope is the session id; for events it's the event id
       const scopeId = payload._token_type === 'session'
         ? (payload.session_id ?? payload.id)
         : payload.id
@@ -81,7 +131,7 @@ export default function AttendPage() {
         setExpiry(prev => {
           if (!prev || prev <= 1) {
             clearInterval(timerRef.current!)
-            setFatalError('This QR session has expired. Please scan the code again.')
+            setFatalError('QR session expired. Please scan again.')
             setPageState('error')
             return 0
           }
@@ -90,54 +140,49 @@ export default function AttendPage() {
       }, 1000)
 
       setPageState('form')
-    })()
+    })
 
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [token]) // supabase is stable, token never changes
+    return () => {
+      active = false
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])   // token never changes; supabase is module-level stable
 
-  // ── 2. Capture geolocation ────────────────────────────────────────────────
-  useEffect(() => {
-    if (!navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const { latitude: lat, longitude: lng } = pos.coords
-        setLocation({ lat, lng })
-        // Reverse-geocode label using Nominatim (free, no API key)
-        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
-          .then(r => r.json())
-          .then(d => {
-            const parts = [d.address?.suburb, d.address?.city, d.address?.country].filter(Boolean)
-            setLocLabel(parts.join(', '))
-          })
-          .catch(() => {})
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    )
-  }, [])
-
-  // ── 3. Submit ─────────────────────────────────────────────────────────────
+  // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setFieldError('')
+    const errs: Record<string, string> = {}
 
-    const validationErrors = validateAttendanceForm({
-      full_name: form.full_name,
-      email:     form.email,
-      phone:     form.phone,
+    if (!location) {
+      errs.location = locState === 'denied'
+        ? 'Location access was denied. Enable it in your browser settings and tap Retry.'
+        : 'Still fetching your location — please wait a moment.'
+    }
+
+    const ve = validateAttendanceForm({
+      full_name:   form.full_name,
+      email:       form.email,
+      phone:       form.phone,
+      institution: form.institution,
+      designation: form.designation,
     })
-    if (Object.keys(validationErrors).length > 0) {
-      setFieldError(Object.values(validationErrors)[0])
+    Object.assign(errs, ve)
+
+    if (!form.institution.trim()) errs.institution = 'Institution is required.'
+    if (!form.designation.trim()) errs.designation = 'Designation is required.'
+
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs)
       return
     }
 
     if (!eventData) return
+    setSubmitting(true)
 
     const scopeId = eventData._token_type === 'session'
       ? (eventData.session_id ?? eventData.id)
       : eventData.id
-
-    setSubmitting(true)
 
     const { error: submitError } = await supabase.from('attendees').insert({
       event_id:           eventData._token_type === 'session' ? eventData.event_id! : eventData.id,
@@ -145,42 +190,34 @@ export default function AttendPage() {
       full_name:          form.full_name.trim(),
       email:              form.email.trim(),
       phone:              form.phone.trim(),
-      institution:        form.institution.trim() || null,
-      designation:        form.designation.trim() || null,
+      institution:        form.institution.trim(),
+      designation:        form.designation.trim(),
       device_fingerprint: getOrCreateDeviceId(),
       qr_token_used:      token,
-      lat:                location?.lat ?? null,
-      lng:                location?.lng ?? null,
+      lat:                location!.lat,
+      lng:                location!.lng,
       location_label:     locLabel || null,
     })
 
     if (submitError) {
-      setFieldError(
-        submitError.message.includes('duplicate')
-          ? 'You have already checked in for this event.'
-          : submitError.message
-      )
+      setFieldErrors({
+        _form: submitError.message.includes('duplicate') || submitError.message.includes('unique')
+          ? 'You have already checked in from this device.'
+          : submitError.message,
+      })
       setSubmitting(false)
       return
     }
 
-    // Cache form values for next scan
     setCachedAttendee(form)
     markSubmitted(scopeId)
-
-    // Stop the expiry timer
     if (timerRef.current) clearInterval(timerRef.current)
-
     setPageState('success')
     setSubmitting(false)
   }
 
-  // ── Render helpers ────────────────────────────────────────────────────────
-  const timeLeft = expiry !== null
-    ? `${Math.floor(expiry / 60)}:${String(expiry % 60).padStart(2, '0')}`
-    : null
-
-  const eventTitle = eventData?.event_name ?? eventData?.name ?? ''
+  const timeLeft    = expiry !== null ? `${Math.floor(expiry / 60)}:${String(expiry % 60).padStart(2, '0')}` : null
+  const eventTitle  = eventData?.event_name ?? eventData?.name ?? ''
   const sessionName = eventData?._token_type === 'session' ? eventData?.name : null
 
   // ── Loading ───────────────────────────────────────────────────────────────
@@ -192,7 +229,7 @@ export default function AttendPage() {
     )
   }
 
-  // ── Fatal error ───────────────────────────────────────────────────────────
+  // ── Error ─────────────────────────────────────────────────────────────────
   if (pageState === 'error') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50 p-6 text-center">
@@ -201,12 +238,6 @@ export default function AttendPage() {
         </div>
         <h1 className="text-lg font-semibold text-gray-900">Check-in unavailable</h1>
         <p className="text-sm text-gray-500 max-w-xs">{fatalError}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="btn-secondary flex items-center gap-2 mt-2"
-        >
-          <Camera className="h-4 w-4" /> Scan again
-        </button>
       </div>
     )
   }
@@ -219,11 +250,12 @@ export default function AttendPage() {
         <h1 className="text-2xl font-bold text-gray-900">Checked in!</h1>
         <p className="text-gray-500">
           Your attendance at <strong>{eventTitle}</strong>
-          {sessionName ? ` (${sessionName})` : ''} has been recorded.
+          {sessionName ? ` — ${sessionName}` : ''} has been recorded.
         </p>
         {location && (
           <p className="flex items-center gap-1 text-xs text-gray-400">
-            <MapPin className="h-3 w-3" /> {locLabel || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`}
+            <MapPin className="h-3 w-3" />
+            {locLabel || `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`}
           </p>
         )}
         <button
@@ -245,90 +277,107 @@ export default function AttendPage() {
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-gray-900 leading-tight truncate">{eventTitle}</h1>
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">{eventTitle}</h1>
               {sessionName && (
                 <p className="mt-0.5 text-sm text-indigo-600 font-medium">Session: {sessionName}</p>
-              )}
-              {location && (
-                <p className="mt-1 flex items-center gap-1 text-xs text-gray-400">
-                  <MapPin className="h-3 w-3" />
-                  {locLabel || 'Location captured'}
-                </p>
               )}
             </div>
             {timeLeft && (
               <div className={`flex items-center gap-1 text-sm font-medium flex-shrink-0 ${
-                expiry && expiry < 60 ? 'text-red-600' : 'text-orange-600'
+                expiry && expiry < 60 ? 'text-red-600' : 'text-orange-500'
               }`}>
                 <Clock className="h-4 w-4" /> {timeLeft}
               </div>
             )}
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <input
-                type="text"
-                placeholder="Full name *"
-                value={form.full_name}
-                onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
-                className="input-base"
-                maxLength={32}
-                required
-              />
+          {/* Location banner */}
+          {locState === 'requesting' && (
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs text-blue-800">
+              <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+              Requesting your location — please allow when prompted.
             </div>
-            <div>
-              <input
-                type="email"
-                placeholder="Email address *"
-                value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                className="input-base"
-                required
-              />
+          )}
+          {locState === 'granted' && location && (
+            <div className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-xs text-green-800">
+              <MapPin className="h-4 w-4 flex-shrink-0 text-green-600" />
+              <span className="min-w-0 truncate">
+                {locLabel || `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`}
+              </span>
             </div>
-            <div>
-              <input
-                type="tel"
-                placeholder="Phone number *"
-                value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                className="input-base"
-                maxLength={15}
-                required
-              />
+          )}
+          {(locState === 'denied' || locState === 'unsupported') && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 text-xs text-red-800 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-red-600" />
+                <div>
+                  <p className="font-semibold">Location required</p>
+                  <p className="mt-0.5">
+                    {locState === 'unsupported'
+                      ? 'Your browser does not support location. Try Chrome or Safari.'
+                      : 'Enable location in your browser settings, then tap Retry.'}
+                  </p>
+                </div>
+              </div>
+              {locState === 'denied' && (
+                <button
+                  type="button"
+                  onClick={startLocationRequest}
+                  className="flex items-center gap-1.5 rounded-md bg-red-100 px-2.5 py-1.5 font-medium hover:bg-red-200"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Retry location
+                </button>
+              )}
             </div>
-            <div>
-              <input
-                type="text"
-                placeholder="Institution (optional)"
-                value={form.institution}
-                onChange={e => setForm(f => ({ ...f, institution: e.target.value }))}
-                className="input-base"
-              />
-            </div>
-            <div>
-              <input
-                type="text"
-                placeholder="Designation (optional)"
-                value={form.designation}
-                onChange={e => setForm(f => ({ ...f, designation: e.target.value }))}
-                className="input-base"
-              />
-            </div>
+          )}
 
-            {fieldError && (
-              <p className="text-xs text-red-600 rounded-lg bg-red-50 px-3 py-2">{fieldError}</p>
+          {/* Fields */}
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {(
+              [
+                { key: 'full_name',   type: 'text',  ph: 'Full name *',          max: 32 },
+                { key: 'email',       type: 'email', ph: 'Email address *'               },
+                { key: 'phone',       type: 'tel',   ph: 'Phone number *',        max: 15 },
+                { key: 'institution', type: 'text',  ph: 'Institution *'                 },
+                { key: 'designation', type: 'text',  ph: 'Designation / Role *'          },
+              ] as Array<{ key: keyof typeof form; type: string; ph: string; max?: number }>
+            ).map(({ key, type, ph, max }) => (
+              <div key={key}>
+                <input
+                  type={type}
+                  placeholder={ph}
+                  value={form[key]}
+                  onChange={e => {
+                    const v = e.target.value
+                    setForm(f => ({ ...f, [key]: v }))
+                    if (fieldErrors[key]) setFieldErrors(p => { const c = { ...p }; delete c[key]; return c })
+                  }}
+                  className={`input-base ${fieldErrors[key] ? 'border-red-300 focus:border-red-400' : ''}`}
+                  maxLength={max}
+                  required
+                />
+                {fieldErrors[key] && (
+                  <p className="mt-1 text-xs text-red-500">{fieldErrors[key]}</p>
+                )}
+              </div>
+            ))}
+
+            {fieldErrors.location && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{fieldErrors.location}</p>
+            )}
+            {fieldErrors._form && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{fieldErrors._form}</p>
             )}
 
             <button
               type="submit"
-              disabled={submitting}
-              className="btn-primary w-full"
+              disabled={submitting || locState === 'requesting'}
+              className="btn-primary w-full disabled:opacity-60"
             >
               {submitting
                 ? <Loader2 className="h-4 w-4 animate-spin" />
+                : locState === 'requesting'
+                ? 'Waiting for location…'
                 : 'Check In'
               }
             </button>

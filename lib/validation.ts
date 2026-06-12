@@ -1,6 +1,7 @@
 // lib/validation.ts
 
 // ── Attendance Form ──────────────────────────────────────────────────────────
+// institution and designation are NOW REQUIRED
 
 export interface FormErrors {
   full_name?:   string;
@@ -28,9 +29,9 @@ export function validateAttendanceForm(data: {
   if (!data.email.trim()) {
     errors.email = 'Email is required.';
   } else {
-    const emailRegex = /^[^\s@]+@([^\s@]+\.(gov\.sl|ac\.sl|com|net|org|edu|gov))$/i;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
     if (!emailRegex.test(data.email.trim())) {
-      errors.email = 'Enter a valid email (e.g. name@gmail.com or name@moe.gov.sl).';
+      errors.email = 'Enter a valid email address.';
     }
   }
 
@@ -40,9 +41,20 @@ export function validateAttendanceForm(data: {
     const cleaned = data.phone.replace(/[\s\-\(\)\+]/g, '');
     if (!/^\d+$/.test(cleaned)) {
       errors.phone = 'Phone must contain only digits.';
+    } else if (cleaned.length < 7) {
+      errors.phone = 'Phone number is too short.';
     } else if (cleaned.length > 15) {
       errors.phone = 'Phone number must not exceed 15 digits.';
     }
+  }
+
+  // REQUIRED — not optional anymore
+  if (!data.institution?.trim()) {
+    errors.institution = 'Institution is required.';
+  }
+
+  if (!data.designation?.trim()) {
+    errors.designation = 'Designation is required.';
   }
 
   return errors;
@@ -58,7 +70,6 @@ export interface EventFormErrors {
   end_time?:   string;
 }
 
-/** Returns today as YYYY-MM-DD in local time */
 function localToday(): string {
   const d = new Date();
   return [
@@ -71,37 +82,32 @@ function localToday(): string {
 export function validateEventForm(data: {
   name:       string;
   location:   string;
-  event_date: string;  // 'YYYY-MM-DD'
-  start_time: string;  // 'HH:MM'
-  end_time:   string;  // 'HH:MM'
+  event_date: string;
+  start_time: string;
+  end_time:   string;
 }): EventFormErrors {
   const errors: EventFormErrors = {};
   const now   = new Date();
   const today = localToday();
 
-  // ── Name & location ───────────────────────────────────────────────────────
   if (!data.name.trim())     errors.name     = 'Event name is required.';
   if (!data.location.trim()) errors.location = 'Location is required.';
 
-  // ── Date ──────────────────────────────────────────────────────────────────
   if (!data.event_date) {
     errors.event_date = 'Event date is required.';
   } else if (data.event_date < today) {
     errors.event_date = 'Event date cannot be in the past.';
   }
 
-  // ── Start time ────────────────────────────────────────────────────────────
   if (!data.start_time) {
     errors.start_time = 'Start time is required.';
   } else if (data.event_date && !errors.event_date) {
-    // Parse as local time — no 'Z' suffix so JS treats it as local
     const startDt = new Date(`${data.event_date}T${data.start_time}:00`);
     if (startDt <= now) {
       errors.start_time = 'Start date & time must be in the future.';
     }
   }
 
-  // ── End time ──────────────────────────────────────────────────────────────
   if (!data.end_time) {
     errors.end_time = 'End time is required.';
   } else if (data.start_time) {
