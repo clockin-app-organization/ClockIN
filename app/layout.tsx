@@ -2,8 +2,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-// app/layout.tsx  — add this import at the top
-import 'leaflet/dist/leaflet.css'
+import 'leaflet/dist/leaflet.css';
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -19,8 +18,14 @@ export const metadata: Metadata = {
   },
   formatDetection: { telephone: false },
   icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/apple-touch-icon.png",
+    icon: [
+      { url: "/icons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
 };
 
@@ -36,11 +41,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <head>
-        <link rel="manifest" href="/manifest.json" />
+        {/* Next.js automatically injects the manifest link from metadata,
+            but keeping it explicit doesn't hurt. */}
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="ClockIN" />
       </head>
       <body className="bg-gray-50 antialiased">{children}</body>
     </html>
