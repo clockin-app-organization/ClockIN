@@ -10,8 +10,11 @@ import { MapPin, Clock, Calendar, Plus, AlertTriangle } from "lucide-react";
 import type { Session, Attendee, RevivalNote } from "@/lib/types";
 import DeleteEventButton from "@/components/events/DeleteEventButton";
 import DownloadAttendeesButton from "@/components/events/DownloadAttendeesButton";
+import EventStatusWatcher from "@/components/events/EventStatusWatcher";   // ← Add this line
+import ManualAttendanceUpload from "@/components/attendance/ManualAttendanceUpload";
 
 export const revalidate = 0;
+export const dynamic = 'force-dynamic';   // ← add this
 
 export default async function EventDetailPage({
   params,
@@ -59,6 +62,9 @@ export default async function EventDetailPage({
   return (
     <div className="space-y-6 p-4 lg:p-6">
 
+      {/* 🔁 Real-time status watcher */}
+      <EventStatusWatcher eventId={event.id} />
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
@@ -87,9 +93,9 @@ export default async function EventDetailPage({
           {event.status !== "archived" && (
             <Link href={`/events/${event.id}/edit`} className="btn-secondary">Edit</Link>
           )}
-          {event.status === "archived" && (
-            <Link href={`/events/${event.id}/revive`} className="btn-primary">Revive</Link>
-          )}
+          {(event.status === "ended" || event.status === "archived") && (
+  <Link href={`/events/${event.id}/revive`} className="btn-primary">Revive</Link>
+)}
           <DeleteEventButton eventId={event.id} eventName={event.name} />
         </div>
       </div>
@@ -154,6 +160,9 @@ export default async function EventDetailPage({
               centerLng={event.lng ?? undefined}
             />
           </div>
+
+          {/* Manual attendance */}
+          <ManualAttendanceUpload eventId={event.id} />
 
           {/* Attendees */}
           <AttendeeTable

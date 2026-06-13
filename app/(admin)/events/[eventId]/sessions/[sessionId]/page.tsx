@@ -10,6 +10,7 @@ import type { Attendee, RevivalNote } from "@/lib/types";
 import StartSessionButton from "@/components/events/StartSessionButton";
 import EndSessionButton from "@/components/events/EndSessionButton";
 import DownloadAttendeesButton from "@/components/events/DownloadAttendeesButton";
+import ManualAttendanceUpload from "@/components/attendance/ManualAttendanceUpload";
 
 export const revalidate = 0;
 
@@ -77,9 +78,9 @@ export default async function SessionDetailPage({
           )}
           {session.status === "pending"  && <StartSessionButton sessionId={sessionId} />}
           {session.status === "active"   && <EndSessionButton   sessionId={sessionId} />}
-          {session.status === "archived" && (
-            <Link href={`/events/${eventId}/sessions/${sessionId}/revive`} className="btn-primary">Revive</Link>
-          )}
+          {(session.status === "ended" || session.status === "archived") && (
+  <Link href={`/events/${eventId}/sessions/${sessionId}/revive`} className="btn-primary">Revive</Link>
+)}
         </div>
       </div>
 
@@ -135,6 +136,9 @@ export default async function SessionDetailPage({
           centerLng={session.event?.lng ?? undefined}
         />
       </div>
+
+      {/* Manual attendance */}
+      <ManualAttendanceUpload eventId={eventId} sessionId={sessionId} />
 
       {/* Full-width attendee table */}
       <AttendeeTable
