@@ -105,7 +105,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
           <p className="mt-0.5 text-sm text-gray-500">
-            {isSuperAdmin ? "System-wide overview" : "Overview of your events"}
+            {isSuperAdmin ? "Welcome!" : "Overview of your events"}
           </p>
         </div>
         <Link href="/events/new" className="btn-primary flex items-center gap-1.5">

@@ -1,4 +1,3 @@
-// app/(admin)/events/[eventId]/revive/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -7,17 +6,17 @@ import { Loader2, ChevronLeft, AlertTriangle, RotateCcw } from "lucide-react";
 import Link from "next/link";
 
 export default function ReviveEventPage() {
-  const router   = useRouter();
-  const params   = useParams();
+  const router = useRouter();
+  const params = useParams();
   const supabase = createClient();
 
   const eventId = params.eventId as string;
 
-  const [name,    setName]    = useState("");
-  const [note,    setNote]    = useState("");
+  const [name, setName] = useState("");
+  const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     supabase
@@ -33,7 +32,10 @@ export default function ReviveEventPage() {
 
   async function handleRevive(e: React.FormEvent) {
     e.preventDefault();
-    if (!note.trim()) { setError("A reason note is required."); return; }
+    if (!note.trim()) {
+      setError("A reason note is required.");
+      return;
+    }
     setError("");
     setSaving(true);
 
@@ -41,8 +43,8 @@ export default function ReviveEventPage() {
 
     const { error: rpcError } = await supabase.rpc("revive_scope", {
       p_scope_type: "event",
-      p_scope_id:   eventId,
-      p_note:       note.trim(),
+      p_scope_id: eventId,
+      p_note: note.trim(),
       p_revived_by: user?.id,
     });
 
@@ -76,7 +78,7 @@ export default function ReviveEventPage() {
         <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
         <span>
           <strong>{name}</strong> will be moved back to <em>upcoming</em> and its QR token
-          re-activated. A reason note is mandatory and cannot be edited later.
+          re‑activated. A reason note is mandatory and cannot be edited later.
         </span>
       </div>
 
@@ -87,7 +89,7 @@ export default function ReviveEventPage() {
             required
             rows={4}
             value={note}
-            onChange={e => setNote(e.target.value)}
+            onChange={(e) => setNote(e.target.value)}
             placeholder="e.g. Event was rescheduled due to venue issue…"
             className="input-base resize-none"
           />
@@ -97,10 +99,13 @@ export default function ReviveEventPage() {
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
         <button type="submit" disabled={saving} className="btn-primary w-full">
-          {saving
-            ? <Loader2 className="h-4 w-4 animate-spin" />
-            : <><RotateCcw className="h-4 w-4" /> Confirm revival</>
-          }
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <RotateCcw className="h-4 w-4" /> Confirm revival
+            </>
+          )}
         </button>
       </form>
     </div>
