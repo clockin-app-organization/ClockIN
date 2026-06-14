@@ -2,8 +2,10 @@
 // Generates a print-ready PDF attendance list using the browser's print engine.
 // No external PDF library needed — we inject a styled HTML page and call window.print().
 "use client";
+import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import type { Attendee } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 
 interface Props {
   eventName:  string;
@@ -14,11 +16,6 @@ interface Props {
   variant?: "default" | "ghost";
 }
 
-// Sierra Leone Coat of Arms — public domain SVG (simplified heraldic version)
-// Using an inline base64 PNG of the official emblem for print fidelity
-const COAT_OF_ARMS_URL =
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Coat_of_arms_of_Sierra_Leone.svg/200px-Coat_of_arms_of_Sierra_Leone.svg.png";
-
 function formatDateLong(dateStr: string): string {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-GB", {
     weekday: "long",
@@ -28,7 +25,7 @@ function formatDateLong(dateStr: string): string {
   });
 }
 
-function buildHTML(props: Props): string {
+function buildHTML(props: Props, institution: string, coatOfArmsUrl: string): string {
   const { eventName, location, eventDate, attendees, sessionName } = props;
   const title  = sessionName ? `${eventName} — ${sessionName}` : eventName;
   const rows   = attendees.map((a, i) => `
@@ -52,8 +49,6 @@ function buildHTML(props: Props): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<title>Attendance List — ${esc(title)}</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   body {
@@ -72,24 +67,21 @@ function buildHTML(props: Props): string {
   }
 
   /* Header */
-  .header { display: flex; align-items: center; gap: 0; margin-bottom: 20px; }
-  .logo-wrap { width: 100px; flex-shrink: 0; text-align: center; }
-  .logo-wrap img { width: 85px; height: auto; }
-  .divider { width: 2.5px; height: 80px; background: #0d2346; margin: 0 18px; flex-shrink: 0; }
-  .org-info { flex: 1; }
+  .header { text-align: center; margin-bottom: 6px; }
   .org-name { font-size: 24px; font-weight: 700; color: #0d2346; margin: 0 0 4px; letter-spacing: 0.4px; }
-  .org-sub  { font-size: 14px; color: #555; margin: 0; font-weight: 500; }
+  .org-sub  { font-size: 14px; color: #555; margin: 0 0 12px; font-weight: 500; }
+  .logo-wrap { text-align: center; margin-top: 12px;  }
+  .logo-wrap img { width: 70px; height: 70px; padding-bottom:5px;}
 
-  .top-bar { height: 3px; background: #0d2346; margin-bottom: 22px; }
+  .top-bar { height: 3px; background: #0d2346; margin-bottom: 12px; }
 
   /* Event info */
-  .event-block { text-align: center; margin-bottom: 24px; }
+  .event-block { text-align: center; margin-bottom: 10px; padding-bottom: 6px; }
   .event-title { font-size: 20px; font-weight: 700; color: #0d2346; margin: 0 0 10px; }
   .event-meta  { font-size: 13px; color: #444; margin: 3px 0; }
   .event-meta strong { color: #212121; }
 
-  .section-bar   { height: 1px; background: #0d2346; margin: 20px 0 10px; }
-  .section-title { font-size: 15px; font-weight: 700; color: #2e7d32; text-align: center; margin: 0 0 12px; letter-spacing: 1px; }
+  .section-title { font-size: 15px; font-weight: 700; color: #2e7d32; text-align: center; margin: 0 0 6px; letter-spacing: 1px; }
 
   /* Table */
   table { width: 100%; border-collapse: collapse; margin-top: 4px; }
@@ -120,14 +112,15 @@ function buildHTML(props: Props): string {
   .col-des  { width: 17%; }
   .col-org  { width: 19%; }
 
-  /* Footer */
-  .footer { margin-top: 30px; font-size: 10px; color: #9e9e9e; text-align: center; }
-
+  @page {
+  margin: 0;
+  size: A4;
+}
   @media print {
-    body { background: #fff; }
-    .page { width: 100%; padding: 0; margin: 0; }
-    thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0d2346 !important; color: #fff !important; }
-  }
+  body { background: #fff; }
+  .page { width: 100%; padding: 18mm 15mm 20mm; margin: 0; }
+  thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0d2346 !important; color: #fff !important; }
+}
 </style>
 </head>
 <body>
@@ -135,13 +128,12 @@ function buildHTML(props: Props): string {
 
   <!-- Header -->
   <div class="header">
-    <div class="logo-wrap">
-      <img src="${COAT_OF_ARMS_URL}" alt="Sierra Leone Coat of Arms" crossorigin="anonymous"/>
-    </div>
-    <div class="divider"></div>
     <div class="org-info">
-      <h1 class="org-name">Ministry of Basic &amp; Senior Secondary Education</h1>
+      <h1 class="org-name">${esc(institution )}</h1>
       <p class="org-sub">Government of Sierra Leone</p>
+    </div>
+    <div class="logo-wrap">
+      <img src="${coatOfArmsUrl}" alt="Sierra Leone Coat of Arms" crossorigin="anonymous"/>
     </div>
   </div>
 
@@ -149,14 +141,13 @@ function buildHTML(props: Props): string {
 
   <!-- Event Info -->
   <div class="event-block">
-    <h2 class="event-title">${esc(title)}</h2>
+    <h2 class="event-title">${esc(eventName)}</h2>
     <p class="event-meta"><strong>Venue:</strong> ${esc(location)}</p>
     <p class="event-meta"><strong>Date:</strong> ${formatDateLong(eventDate)}</p>
     <p class="event-meta"><strong>Total attendees:</strong> ${attendees.length}</p>
     ${sessionName ? `<p class="event-meta"><strong>Session:</strong> ${esc(sessionName)}</p>` : ''}
   </div>
 
-  <div class="section-bar"></div>
   <h3 class="section-title">ATTENDANCE LIST</h3>
 
   <!-- Table -->
@@ -176,10 +167,6 @@ function buildHTML(props: Props): string {
       ${blankRows}
     </tbody>
   </table>
-
-  <div class="footer">
-    Generated by Smart Attendance System &bull; ${new Date().toLocaleString("en-GB")}
-  </div>
 </div>
 </body>
 </html>`;
@@ -194,29 +181,48 @@ function esc(s: string): string {
 }
 
 export default function DownloadAttendeesButton({ variant = "default", ...props }: Props) {
+  const [institution, setInstitution] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("institution").eq("id", user.id).single();
+      if (data?.institution) setInstitution(data.institution);
+    }
+    load();
+  }, []);
+
   function handleDownload() {
-    const html   = buildHTML(props);
-    const win    = window.open("", "_blank", "width=900,height=700");
-    if (!win) { alert("Please allow popups to download the attendance list."); return; }
-    win.document.write(html);
-    win.document.close();
-    // Small delay so the coat of arms image can load before print dialog
+  const origin = window.location.origin;
+  const coatOfArmsUrl = `${origin}/coat-removebg-preview.png`;
+  const html   = buildHTML(props, institution, coatOfArmsUrl);
+  
+  // Option 1: Use an iframe instead of a new window (recommended)
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'absolute';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+  
+  const iframeDoc = iframe.contentWindow?.document;
+  if (iframeDoc) {
+    iframeDoc.open();
+    iframeDoc.write(html);
+    iframeDoc.close();
+    
     setTimeout(() => {
-      win.focus();
-      win.print();
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      // Clean up after printing
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 100);
     }, 800);
   }
-
-  if (variant === "ghost") {
-    return (
-      <button
-        onClick={handleDownload}
-        className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700"
-      >
-        <Download className="h-3.5 w-3.5" /> Download PDF
-      </button>
-    );
-  }
+}
 
   return (
     <button
