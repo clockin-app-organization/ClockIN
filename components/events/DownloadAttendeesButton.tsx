@@ -128,13 +128,11 @@ function buildHTML(props: Props, institution: string, coatOfArmsUrl: string): st
 
   <!-- Header -->
   <div class="header">
-    <div class="org-info">
-      <h1 class="org-name">${esc(institution )}</h1>
-      <p class="org-sub">Government of Sierra Leone</p>
-    </div>
     <div class="logo-wrap">
       <img src="${coatOfArmsUrl}" alt="Sierra Leone Coat of Arms" crossorigin="anonymous"/>
     </div>
+    <p class="org-sub">Government of Sierra Leone</p>
+    <h1 class="org-name">${esc(institution )}</h1>
   </div>
 
   <div class="top-bar"></div>
