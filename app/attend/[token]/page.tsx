@@ -1,4 +1,3 @@
-// app/attend/[token]/page.tsx
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
@@ -16,8 +15,6 @@ import { X, CheckCircle2, Loader2, Clock, MapPin, AlertCircle, RefreshCw } from 
 
 type LocState = 'requesting' | 'granted' | 'denied' | 'unsupported'
 
-// Supabase client is stable across renders — create once outside the component
-// so it never appears in dependency arrays.
 const supabase = createClient()
 
 export default function AttendPage() {
@@ -34,7 +31,7 @@ export default function AttendPage() {
   const [locLabel,    setLocLabel]    = useState('')
   const [locState,    setLocState]    = useState<LocState>('requesting')
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
-  const locStarted = useRef(false)   // prevent double-firing in StrictMode
+  const locStarted = useRef(false)
 
   const [form, setForm] = useState({
     full_name:   '',
@@ -45,7 +42,6 @@ export default function AttendPage() {
   })
 
   // ── Geolocation ───────────────────────────────────────────────────────────
-  // Not a useCallback — called imperatively so it never sits in a dep array.
   function startLocationRequest() {
     if (!navigator.geolocation) {
       setLocState('unsupported')
@@ -81,80 +77,78 @@ export default function AttendPage() {
   }
 
   // ── Token validation (runs once on mount) ────────────────────────────────
- useEffect(() => {
-  // Start location fetch in parallel — no setState called synchronously
-  if (!locStarted.current) {
-    locStarted.current = true;
-    setTimeout(startLocationRequest, 0);
-  }
-
-  let active = true;
-
-  // ⬇️ Run sync first, then validate
-  (async () => {
-    try {
-      await supabase.rpc('sync_event_statuses');
-    } catch (e) {
-      console.error('Failed to sync event statuses', e);
-    }
-    return supabase.rpc('validate_attendance_token', { p_token: token });
-  })().then(({ data, error }) => {
-    if (!active) return;
-
-    if (error || !data) {
-      setFatalError('This QR code is invalid or has expired.');
-      setPageState('error');
-      return;
+  useEffect(() => {
+    if (!locStarted.current) {
+      locStarted.current = true
+      setTimeout(startLocationRequest, 0)
     }
 
-    const payload = data as TokenPayload;
-    setEventData(payload);
+    let active = true
 
-    // Pre-fill from local cache
-    const cached = getCachedAttendee();
-    if (cached) {
-      setForm({
-        full_name:   cached.full_name   ?? '',
-        email:       cached.email       ?? '',
-        phone:       cached.phone       ?? '',
-        institution: cached.institution ?? '',
-        designation: cached.designation ?? '',
-      });
+    ;(async () => {
+      try {
+        await supabase.rpc('sync_event_statuses')
+      } catch (e) {
+        console.error('Failed to sync event statuses', e)
+      }
+      return supabase.rpc('validate_attendance_token', { p_token: token })
+    })().then(({ data, error }) => {
+      if (!active) return
+
+      if (error || !data) {
+        setFatalError('This QR code is invalid or has expired.')
+        setPageState('error')
+        return
+      }
+
+      const payload = data as TokenPayload
+      setEventData(payload)
+
+      // Pre-fill from local cache
+      const cached = getCachedAttendee()
+      if (cached) {
+        setForm({
+          full_name:   cached.full_name   ?? '',
+          email:       cached.email       ?? '',
+          phone:       cached.phone       ?? '',
+          institution: cached.institution ?? '',
+          designation: cached.designation ?? '',
+        })
+      }
+
+      const scopeId = payload._token_type === 'session'
+        ? (payload.session_id ?? payload.id)
+        : payload.id
+
+      if (hasSubmittedForScope(scopeId)) {
+        setFatalError('You have already checked in for this event.')
+        setPageState('error')
+        return
+      }
+
+      // 5-minute countdown
+      setExpiry(300)
+      timerRef.current = setInterval(() => {
+        setExpiry(prev => {
+          if (!prev || prev <= 1) {
+            clearInterval(timerRef.current!)
+            setFatalError('QR session expired. Please scan again.')
+            setPageState('error')
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+
+      setPageState('form')
+    })
+
+    return () => {
+      active = false
+      if (timerRef.current) clearInterval(timerRef.current)
     }
-
-    const scopeId = payload._token_type === 'session'
-      ? (payload.session_id ?? payload.id)
-      : payload.id;
-
-    if (hasSubmittedForScope(scopeId)) {
-      setFatalError('You have already checked in for this event.');
-      setPageState('error');
-      return;
-    }
-
-    // 5-minute countdown
-    setExpiry(300);
-    timerRef.current = setInterval(() => {
-      setExpiry(prev => {
-        if (!prev || prev <= 1) {
-          clearInterval(timerRef.current!);
-          setFatalError('QR session expired. Please scan again.');
-          setPageState('error');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    setPageState('form');
-  });
-
-  return () => {
-    active = false;
-    if (timerRef.current) clearInterval(timerRef.current);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [token]); // token never changes; supabase is stable
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
 
   // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
@@ -207,17 +201,19 @@ export default function AttendPage() {
     })
 
     if (submitError) {
-      let msg = submitError.message;
+      let msg = submitError.message
       if (msg.includes('duplicate') || msg.includes('unique')) {
         if (msg.includes('phone')) {
-          msg = 'This phone number has already been used for this event/session.';
+          msg = 'This phone number has already been used for this event/session.'
         } else if (msg.includes('email')) {
-          msg = 'This email has already been used for this event/session.';
+          msg = 'This email has already been used for this event/session.'
         } else {
-          msg = 'You have already checked in from this device.';
+          msg = 'You have already checked in from this device.'
         }
       }
-      setFieldErrors({ _form: msg });
+      setFieldErrors({ _form: msg })
+      setSubmitting(false)
+      return
     }
 
     setCachedAttendee(form)
@@ -344,34 +340,113 @@ export default function AttendPage() {
 
           {/* Fields */}
           <form onSubmit={handleSubmit} className="space-y-3">
-            {(
-              [
-                { key: 'full_name',   type: 'text',  ph: 'Full name *',          max: 32 },
-                { key: 'email',       type: 'email', ph: 'Email address *'               },
-                { key: 'phone',       type: 'tel',   ph: 'Phone number *',        max: 15 },
-                { key: 'institution', type: 'text',  ph: 'Institution *'                 },
-                { key: 'designation', type: 'text',  ph: 'Designation / Role *'          },
-              ] as Array<{ key: keyof typeof form; type: string; ph: string; max?: number }>
-            ).map(({ key, type, ph, max }) => (
-              <div key={key}>
-                <input
-                  type={type}
-                  placeholder={ph}
-                  value={form[key]}
-                  onChange={e => {
-                    const v = e.target.value
-                    setForm(f => ({ ...f, [key]: v }))
-                    if (fieldErrors[key]) setFieldErrors(p => { const c = { ...p }; delete c[key]; return c })
-                  }}
-                  className={`input-base ${fieldErrors[key] ? 'border-red-300 focus:border-red-400' : ''}`}
-                  maxLength={max}
-                  required
-                />
-                {fieldErrors[key] && (
-                  <p className="mt-1 text-xs text-red-500">{fieldErrors[key]}</p>
-                )}
-              </div>
-            ))}
+
+            {/* Full name */}
+            <div>
+              <input
+                type="text"
+                name="full_name"
+                autoComplete="name"
+                placeholder="Full name *"
+                value={form.full_name}
+                onChange={e => {
+                  const v = e.target.value
+                  setForm(f => ({ ...f, full_name: v }))
+                  if (fieldErrors.full_name) setFieldErrors(p => { const c = { ...p }; delete c.full_name; return c })
+                }}
+                className={`input-base ${fieldErrors.full_name ? 'border-red-300 focus:border-red-400' : ''}`}
+                maxLength={32}
+                required
+              />
+              {fieldErrors.full_name && (
+                <p className="mt-1 text-xs text-red-500">{fieldErrors.full_name}</p>
+              )}
+            </div>
+
+            {/* Email */}
+            <div>
+              <input
+                type="email"
+                name="email"
+                autoComplete="email"
+                placeholder="Email address *"
+                value={form.email}
+                onChange={e => {
+                  const v = e.target.value
+                  setForm(f => ({ ...f, email: v }))
+                  if (fieldErrors.email) setFieldErrors(p => { const c = { ...p }; delete c.email; return c })
+                }}
+                className={`input-base ${fieldErrors.email ? 'border-red-300 focus:border-red-400' : ''}`}
+                required
+              />
+              {fieldErrors.email && (
+                <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>
+              )}
+            </div>
+
+            {/* Phone */}
+            <div>
+              <input
+                type="tel"
+                name="phone"
+                autoComplete="tel-national"
+                placeholder="Phone number *"
+                value={form.phone}
+                onChange={e => {
+                  const v = e.target.value
+                  setForm(f => ({ ...f, phone: v }))
+                  if (fieldErrors.phone) setFieldErrors(p => { const c = { ...p }; delete c.phone; return c })
+                }}
+                className={`input-base ${fieldErrors.phone ? 'border-red-300 focus:border-red-400' : ''}`}
+                maxLength={15}
+                required
+              />
+              {fieldErrors.phone && (
+                <p className="mt-1 text-xs text-red-500">{fieldErrors.phone}</p>
+              )}
+            </div>
+
+            {/* Institution */}
+            <div>
+              <input
+                type="text"
+                name="institution"
+                autoComplete="organization"
+                placeholder="Institution *"
+                value={form.institution}
+                onChange={e => {
+                  const v = e.target.value
+                  setForm(f => ({ ...f, institution: v }))
+                  if (fieldErrors.institution) setFieldErrors(p => { const c = { ...p }; delete c.institution; return c })
+                }}
+                className={`input-base ${fieldErrors.institution ? 'border-red-300 focus:border-red-400' : ''}`}
+                required
+              />
+              {fieldErrors.institution && (
+                <p className="mt-1 text-xs text-red-500">{fieldErrors.institution}</p>
+              )}
+            </div>
+
+            {/* Designation */}
+            <div>
+              <input
+                type="text"
+                name="designation"
+                autoComplete="organization-title"
+                placeholder="Designation / Role *"
+                value={form.designation}
+                onChange={e => {
+                  const v = e.target.value
+                  setForm(f => ({ ...f, designation: v }))
+                  if (fieldErrors.designation) setFieldErrors(p => { const c = { ...p }; delete c.designation; return c })
+                }}
+                className={`input-base ${fieldErrors.designation ? 'border-red-300 focus:border-red-400' : ''}`}
+                required
+              />
+              {fieldErrors.designation && (
+                <p className="mt-1 text-xs text-red-500">{fieldErrors.designation}</p>
+              )}
+            </div>
 
             {fieldErrors.location && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{fieldErrors.location}</p>

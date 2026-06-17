@@ -2,12 +2,31 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Archive, FolderOpen, RotateCcw } from "lucide-react";
+import { Archive, Eye, FolderOpen } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import type { Event, Session } from "@/lib/types";
 import { getSession } from "@/lib/supabase/server";
 
 export const revalidate = 0;
+
+// Inline types for query results
+type EventRow = {
+  id: string;
+  name: string;
+  location: string;
+  event_date: string;
+  archived_at: string | null;
+  status: string;
+  creator?: { full_name: string | null; email: string | null } | null;
+};
+
+type SessionRow = {
+  id: string;
+  name: string;
+  event_id: string;
+  archived_at: string | null;
+  status: string;
+  event: { id: string; name: string } | null;
+};
 
 export default async function ArchivePage() {
   const session = await getSession();
@@ -16,7 +35,6 @@ export default async function ArchivePage() {
   const supabase = await createClient();
   const currentUserId = session.user.id;
 
-  // Check if super admin
   const { data: profile } = await supabase
     .from("profiles")
     .select("is_super_admin")
@@ -25,38 +43,34 @@ export default async function ArchivePage() {
 
   const isSuperAdmin = profile?.is_super_admin ?? false;
 
-  // Base queries
-  let eventsQuery = supabase
+  // 1. Events query
+  let eventQuery = supabase
     .from("events")
-    .select("*")
-    .in("status", ["ended", "archived"])
-    .order("archived_at", { ascending: false, nullsFirst: false });
+    .select("*, creator:profiles!events_created_by_fkey (full_name, email)")
+    .in("status", ["ended", "archived"]);
 
-  let sessionsQuery = supabase
-    .from("sessions")
-    .select("*, event:events(id,name,created_by)")
-    .in("status", ["ended", "archived"])
-    .order("archived_at", { ascending: false, nullsFirst: false });
-
-  // If not super admin, filter by creator
   if (!isSuperAdmin) {
-    eventsQuery = eventsQuery.eq("created_by", currentUserId);
+    eventQuery = eventQuery.eq("created_by", currentUserId);
+  }
 
-    // Sessions: only those belonging to events created by this user
-    // We need to join logic: sessions where event.created_by = currentUserId
-    // Since we can't filter directly on joined table easily, we can fetch eligible event IDs first.
+  eventQuery = eventQuery.order("archived_at", { ascending: false, nullsFirst: false });
+
+  // 2. Sessions query
+  let sessionQuery = supabase
+    .from("sessions")
+    .select("*, event:events(id, name, created_by)")
+    .in("status", ["ended", "archived"]);
+
+  if (!isSuperAdmin) {
     const { data: userEventIds } = await supabase
       .from("events")
       .select("id")
       .eq("created_by", currentUserId);
 
-    const ids = userEventIds?.map((e) => e.id) ?? [];
-    if (ids.length > 0) {
-      sessionsQuery = sessionsQuery.in("event_id", ids);
-    } else {
-      // No events created by this user, return empty arrays
+    const eventIds = userEventIds?.map((e) => e.id) ?? [];
+    if (eventIds.length === 0) {
       return (
-        <ArchivePageUI
+        <ArchiveUI
           events={[]}
           sessions={[]}
           totalArchived={0}
@@ -64,17 +78,21 @@ export default async function ArchivePage() {
         />
       );
     }
+    sessionQuery = sessionQuery.in("event_id", eventIds);
   }
 
+  sessionQuery = sessionQuery.order("archived_at", { ascending: false, nullsFirst: false });
+
+  // 3. Execute queries
   const [{ data: events }, { data: sessions }] = await Promise.all([
-    eventsQuery,
-    sessionsQuery,
+    eventQuery,
+    sessionQuery,
   ]);
 
   const totalArchived = (events?.length ?? 0) + (sessions?.length ?? 0);
 
   return (
-    <ArchivePageUI
+    <ArchiveUI
       events={events ?? []}
       sessions={sessions ?? []}
       totalArchived={totalArchived}
@@ -83,14 +101,15 @@ export default async function ArchivePage() {
   );
 }
 
-// Presentational component (to avoid repetition)
-function ArchivePageUI({
+// Presentational component
+function ArchiveUI({
   events,
   sessions,
   totalArchived,
+  isSuperAdmin,
 }: {
-  events: Event[];
-  sessions: (Session & { event: { id: string; name: string } | null })[];
+  events: EventRow[];
+  sessions: SessionRow[];
   totalArchived: number;
   isSuperAdmin: boolean;
 }) {
@@ -126,10 +145,15 @@ function ArchivePageUI({
           <div className="card overflow-hidden">
             <div className="divide-y divide-gray-50">
               {events.map((e) => (
-                <div key={e.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                <div
+                  key={e.id}
+                  className="flex items-center justify-between gap-3 px-5 py-3"
+                >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-gray-900">{e.name}</p>
+                      <p className="truncate text-sm font-semibold text-gray-900">
+                        {e.name}
+                      </p>
                       {e.status === "ended" && (
                         <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
                           Ended
@@ -144,23 +168,21 @@ function ArchivePageUI({
                     <p className="text-xs text-gray-400">
                       {e.location} · {formatDate(e.event_date)}
                       {e.archived_at && ` · Archived ${formatDate(e.archived_at)}`}
+                      {isSuperAdmin && e.creator && (
+                        <span className="ml-1 text-purple-600">
+                          · {e.creator.full_name || e.creator.email}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link
                       href={`/events/${e.id}`}
-                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      title="View details"
                     >
-                      View
+                      <Eye className="h-4 w-4" />
                     </Link>
-                    {(e.status === "ended" || e.status === "archived") && (
-                      <Link
-                        href={`/events/${e.id}/revive`}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                      >
-                        <RotateCcw className="h-3 w-3" /> Revive
-                      </Link>
-                    )}
                   </div>
                 </div>
               ))}
@@ -176,10 +198,15 @@ function ArchivePageUI({
           <div className="card overflow-hidden">
             <div className="divide-y divide-gray-50">
               {sessions.map((s) => (
-                <div key={s.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between gap-3 px-5 py-3"
+                >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-gray-900">{s.name}</p>
+                      <p className="truncate text-sm font-semibold text-gray-900">
+                        {s.name}
+                      </p>
                       {s.status === "ended" && (
                         <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
                           Ended
@@ -199,18 +226,11 @@ function ArchivePageUI({
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link
                       href={`/events/${s.event_id}/sessions/${s.id}`}
-                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      title="View details"
                     >
-                      View
+                      <Eye className="h-4 w-4" />
                     </Link>
-                    {(s.status === "ended" || s.status === "archived") && (
-                      <Link
-                        href={`/events/${s.event_id}/sessions/${s.id}/revive`}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                      >
-                        <RotateCcw className="h-3 w-3" /> Revive
-                      </Link>
-                    )}
                   </div>
                 </div>
               ))}

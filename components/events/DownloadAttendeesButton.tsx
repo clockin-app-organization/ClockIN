@@ -1,6 +1,4 @@
 // components/events/DownloadAttendeesButton.tsx
-// Generates a print-ready PDF attendance list using the browser's print engine.
-// No external PDF library needed — we inject a styled HTML page and call window.print().
 "use client";
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
@@ -119,6 +117,7 @@ function buildHTML(props: Props, institution: string, coatOfArmsUrl: string): st
   @media print {
   body { background: #fff; }
   .page { width: 100%; padding: 18mm 15mm 20mm; margin: 0; }
+  thead { display: table-row-group; }
   thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #0d2346 !important; color: #fff !important; }
 }
 </style>
@@ -197,7 +196,7 @@ export default function DownloadAttendeesButton({ variant = "default", ...props 
   const coatOfArmsUrl = `${origin}/coat-removebg-preview.png`;
   const html   = buildHTML(props, institution, coatOfArmsUrl);
   
-  // Option 1: Use an iframe instead of a new window (recommended)
+  // Use an iframe to trigger print without opening a new window
   const iframe = document.createElement('iframe');
   iframe.style.position = 'absolute';
   iframe.style.width = '0';
