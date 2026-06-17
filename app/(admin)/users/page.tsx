@@ -43,7 +43,11 @@ export default async function UsersPage() {
         <div className="card overflow-hidden">
           <div className="divide-y divide-gray-50">
             {profiles.map((p: Profile) => (
-              <div key={p.id} className="flex items-center gap-3 px-5 py-3">
+              <Link
+                key={p.id}
+                href={`/users/${p.id}`}
+                className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+              >
                 <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-600">
                   {(p.full_name || p.email)[0].toUpperCase()}
                 </div>
@@ -61,7 +65,7 @@ export default async function UsersPage() {
                   <span className={`h-2 w-2 rounded-full ${p.is_active ? "bg-green-500" : "bg-gray-300"}`} />
                   <span className="text-xs text-gray-400">{p.is_active ? "Active" : "Inactive"}</span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

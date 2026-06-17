@@ -207,13 +207,17 @@ export default function AttendPage() {
     })
 
     if (submitError) {
-      setFieldErrors({
-        _form: submitError.message.includes('duplicate') || submitError.message.includes('unique')
-          ? 'You have already checked in from this device.'
-          : submitError.message,
-      })
-      setSubmitting(false)
-      return
+      let msg = submitError.message;
+      if (msg.includes('duplicate') || msg.includes('unique')) {
+        if (msg.includes('phone')) {
+          msg = 'This phone number has already been used for this event/session.';
+        } else if (msg.includes('email')) {
+          msg = 'This email has already been used for this event/session.';
+        } else {
+          msg = 'You have already checked in from this device.';
+        }
+      }
+      setFieldErrors({ _form: msg });
     }
 
     setCachedAttendee(form)

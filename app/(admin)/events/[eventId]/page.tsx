@@ -206,11 +206,13 @@ export default async function EventDetailPage({
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-gray-900">Sessions</h3>
                 {event.status !== "archived" && (
-                  <Link href={`/events/${event.id}/sessions/new`}
-                    className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700">
-                    <Plus className="h-4 w-4" /> Add
-                  </Link>
-                )}
+                <Link
+                  href={`/events/${event.id}/sessions/new`}
+                  className="btn-secondary inline-flex items-center gap-1.5 text-sm"
+                >
+                  <Plus className="h-4 w-4" /> Add session
+                </Link>
+              )}
               </div>
               {event.sessions?.length === 0 && <p className="text-sm text-gray-400">No sessions yet.</p>}
               {event.sessions?.map((s: Session) => (
