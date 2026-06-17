@@ -126,6 +126,15 @@ export default async function SessionDetailPage({
         </div>
       )}
 
+      {/* Full-width attendee table */}
+      <AttendeeTable
+        attendees={safeAttendees}
+        revivalAt={latestNote?.created_at ?? null}
+      />
+
+      {/* Manual attendance */}
+      <ManualAttendanceUpload eventId={eventId} sessionId={sessionId} />
+
       {/* Full-width map */}
       <div className="card p-6">
         <h2 className="section-title mb-4">Attendee Map</h2>
@@ -136,15 +145,6 @@ export default async function SessionDetailPage({
           centerLng={session.event?.lng ?? undefined}
         />
       </div>
-
-      {/* Manual attendance */}
-      <ManualAttendanceUpload eventId={eventId} sessionId={sessionId} />
-
-      {/* Full-width attendee table */}
-      <AttendeeTable
-        attendees={safeAttendees}
-        revivalAt={latestNote?.created_at ?? null}
-      />
 
       {/* Revival history */}
       {safeNotes.length > 1 && (

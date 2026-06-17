@@ -137,8 +137,8 @@ export default function LoginContent() {
         <div className="card p-6">
           {step === "email" && (
             <>
-              <h2 className="mb-1 text-base font-semibold text-gray-900">Sign in</h2>
-              <p className="mb-5 text-sm text-gray-500">Enter your email to continue.</p>
+              <h2 className="mb-1 text-base font-semibold text-center text-gray-900">Sign in</h2>
+              <p className="mb-5 text-sm text-gray-500 text-center">Enter your email to continue.</p>
               <form onSubmit={handleEmailSubmit} className="space-y-4">
                 <div>
                   <label className="label">Email address</label>
@@ -167,7 +167,7 @@ export default function LoginContent() {
               <button onClick={resetToEmail} className="mb-4 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
                 <ArrowLeft className="h-3.5 w-3.5" /> Back
               </button>
-              <h2 className="mb-1 text-base font-semibold text-gray-900">Welcome back</h2>
+              <h2 className="mb-1 text-base font-semibold text-gray-900">Welcome back,</h2>
               <p className="mb-5 truncate text-sm text-gray-500">{email}</p>
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div>
@@ -201,7 +201,7 @@ export default function LoginContent() {
                 <ArrowLeft className="h-3.5 w-3.5" /> Back
               </button>
               <h2 className="mb-1 text-base font-semibold text-gray-900">Create your password</h2>
-              <p className="mb-5 text-sm text-gray-500">
+              <p className="mb-5 text-sm text-gray-500 text-center">
                 First login for <span className="font-medium text-gray-700">{email}</span>.
                 Set a password to secure your account.
               </p>

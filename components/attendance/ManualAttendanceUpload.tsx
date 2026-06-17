@@ -126,7 +126,7 @@ export default function ManualAttendanceUpload({
   return (
     <div className="card p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="section-title">Manual Attendance</h2>
+        <h2 className="section-title text-sm md:text-base">Manual Attendance</h2>
         <div>
           <input
             ref={fileInputRef}
@@ -146,13 +146,14 @@ export default function ManualAttendanceUpload({
             ) : (
               <Camera className="h-4 w-4" />
             )}
-            {uploading ? 'Uploading…' : 'Add Photo'}
+            <span className="hidden sm:inline">{uploading ? 'Uploading…' : 'Add Photo'}</span>
+            <span className="sm:hidden">{uploading ? '…' : 'Add'}</span>
           </label>
         </div>
       </div>
 
       {images.length === 0 && (
-        <p className="text-sm text-gray-400 text-center py-4">
+        <p className="text-xs sm:text-sm text-gray-400 text-center py-4">
           No manual attendance photos yet.
         </p>
       )}
@@ -192,7 +193,7 @@ export default function ManualAttendanceUpload({
               <Trash2 className="h-3.5 w-3.5" />
             </button>
 
-            <div className="p-2 text-xs text-gray-500">
+            <div className="p-2 text-[10px] sm:text-xs text-gray-500">
               {new Date(img.created_at).toLocaleString([], {
                 dateStyle: 'short',
                 timeStyle: 'short',
@@ -237,7 +238,7 @@ export default function ManualAttendanceUpload({
               unoptimized
             />
 
-            <div className="p-3 text-sm text-gray-600 text-center">
+            <div className="p-3 text-xs sm:text-sm text-gray-600 text-center">
               {new Date(selectedImage.created_at).toLocaleString([], {
                 dateStyle: 'full',
                 timeStyle: 'short',

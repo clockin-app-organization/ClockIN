@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect }     from "next/navigation";
 import Link             from "next/link";
-import { Archive, FolderOpen, RotateCcw } from "lucide-react";
+import { Archive, Eye, FolderOpen, RotateCcw } from "lucide-react";
 import { formatDate }   from "@/lib/utils";
 import type { Event, Session } from "@/lib/types";
 import { getSession }   from "@/lib/supabase/server";
@@ -86,19 +86,11 @@ export default async function ArchivePage() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link
                       href={`/events/${e.id}`}
-                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      title="View details"
                     >
-                      View
+                      <Eye className="h-4 w-4" />
                     </Link>
-                    {/* Revive visible for both ended and archived */}
-                    {(e.status === "ended" || e.status === "archived") && (
-                      <Link
-                        href={`/events/${e.id}/revive`}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                      >
-                        <RotateCcw className="h-3 w-3" /> Revive
-                      </Link>
-                    )}
                   </div>
                 </div>
               ))}
@@ -137,19 +129,11 @@ export default async function ArchivePage() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link
                       href={`/events/${s.event_id}/sessions/${s.id}`}
-                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      title="View details"
                     >
-                      View
+                      <Eye className="h-4 w-4" />
                     </Link>
-                    {/* Revive visible for both ended and archived */}
-                    {(s.status === "ended" || s.status === "archived") && (
-                      <Link
-                        href={`/events/${s.event_id}/sessions/${s.id}/revive`}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                      >
-                        <RotateCcw className="h-3 w-3" /> Revive
-                      </Link>
-                    )}
                   </div>
                 </div>
               ))}

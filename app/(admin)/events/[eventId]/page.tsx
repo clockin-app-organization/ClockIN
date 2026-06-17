@@ -156,6 +156,15 @@ export default async function EventDetailPage({
             </div>
           )}
 
+          {/* Attendees */}
+          <AttendeeTable
+            attendees={safeAttendees}
+            revivalAt={latestNote?.created_at ?? null}
+          />
+
+          {/* Manual attendance */}
+          <ManualAttendanceUpload eventId={event.id} />
+
           {/* Map */}
           <div className="card p-6">
             <h2 className="section-title mb-4">Attendee Map</h2>
@@ -166,15 +175,6 @@ export default async function EventDetailPage({
               centerLng={event.lng ?? undefined}
             />
           </div>
-
-          {/* Manual attendance */}
-          <ManualAttendanceUpload eventId={event.id} />
-
-          {/* Attendees */}
-          <AttendeeTable
-            attendees={safeAttendees}
-            revivalAt={latestNote?.created_at ?? null}
-          />
 
           {/* Revival history */}
           {safeNotes.length > 1 && (

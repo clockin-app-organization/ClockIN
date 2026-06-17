@@ -16,7 +16,7 @@ function buildNav(isSuperAdmin: boolean) {
   return [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Events",    href: "/events",    icon: Calendar },
-    { label: "Sessions",  href: "/sessions",  icon: ClipboardList },
+    
     { label: "Archive",   href: "/archive",   icon: Archive },
     isSuperAdmin
       ? { label: "Users",   href: "/users",   icon: Users }
