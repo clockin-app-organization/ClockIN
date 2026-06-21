@@ -6,15 +6,15 @@ import QRDisplay from "@/components/qr/QRDisplay";
 import HeatMap from "@/components/attendance/HeatMap";
 import AttendeeTable from "@/components/attendance/AttendeeTable";
 import { formatDate, formatTime } from "@/lib/utils";
-import { MapPin, Clock, Calendar, Plus, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, Calendar, Plus, AlertTriangle, Users, UserCheck } from "lucide-react";
 import type { Session, Attendee, RevivalNote } from "@/lib/types";
 import DeleteEventButton from "@/components/events/DeleteEventButton";
 import DownloadAttendeesButton from "@/components/events/DownloadAttendeesButton";
-import EventStatusWatcher from "@/components/events/EventStatusWatcher";   // ← Add this line
+import EventStatusWatcher from "@/components/events/EventStatusWatcher";
 import ManualAttendanceUpload from "@/components/attendance/ManualAttendanceUpload";
 
 export const revalidate = 0;
-export const dynamic = 'force-dynamic';   // ← add this
+export const dynamic = 'force-dynamic';
 
 export default async function EventDetailPage({
   params,
@@ -52,17 +52,35 @@ export default async function EventDetailPage({
   const safeNotes: RevivalNote[]  = revivalNotes ?? [];
   const latestNote                = safeNotes[0] ?? null;
 
-  // QR is shown for upcoming AND active (not ended/archived)
-  // Upcoming: admins can display/print it before the event starts
-  // Active:   attendees scan it live
+  // Session‑based stats
+  let uniqueAttendeesCount = 0;
+  let singleSessionCount = 0;
+
+  if (event.has_sessions) {
+    const { data: sessionAttendees } = await supabase
+      .from("attendees")
+      .select("email, session_id")
+      .eq("event_id", event.id)
+      .not("session_id", "is", null);
+
+    if (sessionAttendees) {
+      const emailMap = new Map<string, Set<string>>();
+      for (const a of sessionAttendees) {
+        if (!emailMap.has(a.email)) emailMap.set(a.email, new Set());
+        emailMap.get(a.email)!.add(a.session_id);
+      }
+      uniqueAttendeesCount = emailMap.size;
+      singleSessionCount = [...emailMap.values()].filter(s => s.size === 1).length;
+    }
+  }
+
   const showQR = !event.has_sessions
-&& event.qr_token
-&& (event.status === "upcoming" || event.status === "active");
+    && event.qr_token
+    && (event.status === "upcoming" || event.status === "active");
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
 
-      {/* 🔁 Real-time status watcher */}
       <EventStatusWatcher eventId={event.id} />
 
       {/* Header */}
@@ -94,8 +112,8 @@ export default async function EventDetailPage({
             <Link href={`/events/${event.id}/edit`} className="btn-secondary">Edit</Link>
           )}
           {(event.status === "ended" || event.status === "archived") && (
-  <Link href={`/events/${event.id}/revive`} className="btn-primary">Revive</Link>
-)}
+            <Link href={`/events/${event.id}/revive`} className="btn-primary">Revive</Link>
+          )}
           <DeleteEventButton eventId={event.id} eventName={event.name} />
         </div>
       </div>
@@ -119,9 +137,9 @@ export default async function EventDetailPage({
         </div>
       )}
 
+      {/* ── Non‑session event ─────────────────────────────── */}
       {!event.has_sessions ? (
         <div className="space-y-6">
-          {/* Stats row */}
           <div className="card p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total check-ins</p>
@@ -134,38 +152,34 @@ export default async function EventDetailPage({
             )}
           </div>
 
-          {/* QR code — shown for upcoming and active */}
           {showQR && (
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
-  <h2 className="section-title">QR Code</h2>
-  {event.status === "active" ? (
-  <span className="flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-    Live — accepting check-ins
-  </span>
-) : (
-  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-    Upcoming – QR ready for sharing
-  </span>
-)}
-</div>
+                <h2 className="section-title">QR Code</h2>
+                {event.status === "active" ? (
+                  <span className="flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                    Live — accepting check-ins
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                    Upcoming – QR ready for sharing
+                  </span>
+                )}
+              </div>
               <div className="flex justify-center">
                 <QRDisplay token={event.qr_token} label={`Scan to check in: ${event.name}`} />
               </div>
             </div>
           )}
 
-          {/* Attendees */}
           <AttendeeTable
             attendees={safeAttendees}
             revivalAt={latestNote?.created_at ?? null}
           />
 
-          {/* Manual attendance */}
           <ManualAttendanceUpload eventId={event.id} />
 
-          {/* Map */}
           <div className="card p-6">
             <h2 className="section-title mb-4">Attendee Map</h2>
             <HeatMap
@@ -176,7 +190,6 @@ export default async function EventDetailPage({
             />
           </div>
 
-          {/* Revival history */}
           {safeNotes.length > 1 && (
             <div className="card p-4 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Revival history</p>
@@ -192,20 +205,44 @@ export default async function EventDetailPage({
           )}
         </div>
       ) : (
-        /* Session-based event */
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <p className="text-sm text-gray-500">This event uses sessions. Attendees check in per session.</p>
-          </div>
-          <div className="space-y-4">
-            <div className="card p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total sessions</p>
-              <p className="mt-1 text-3xl font-bold text-gray-900">{event.sessions?.length ?? 0}</p>
+        /* ── Session‑based event ─────────────────────────── */
+        <>
+          {/* Score cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="card p-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50">
+                <Users className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total unique attendees</p>
+                <p className="text-2xl font-bold text-gray-900">{uniqueAttendeesCount}</p>
+              </div>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">Sessions</h3>
-                {event.status !== "archived" && (
+            <div className="card p-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
+                <UserCheck className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Attended 1 session only</p>
+                <p className="text-2xl font-bold text-gray-900">{singleSessionCount}</p>
+              </div>
+            </div>
+            <div className="card p-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50">
+                <Clock className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total sessions</p>
+                <p className="text-2xl font-bold text-gray-900">{event.sessions?.length ?? 0}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Sessions list */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Sessions</h3>
+              {event.status !== "archived" && (
                 <Link
                   href={`/events/${event.id}/sessions/new`}
                   className="btn-secondary inline-flex items-center gap-1.5 text-sm"
@@ -213,11 +250,17 @@ export default async function EventDetailPage({
                   <Plus className="h-4 w-4" /> Add session
                 </Link>
               )}
-              </div>
-              {event.sessions?.length === 0 && <p className="text-sm text-gray-400">No sessions yet.</p>}
+            </div>
+            {event.sessions?.length === 0 && (
+              <p className="text-sm text-gray-400">No sessions yet.</p>
+            )}
+            <div className="grid gap-3">
               {event.sessions?.map((s: Session) => (
-                <Link key={s.id} href={`/events/${event.id}/sessions/${s.id}`}
-                  className="card flex items-center gap-3 p-4 transition-shadow hover:shadow-md">
+                <Link
+                  key={s.id}
+                  href={`/events/${event.id}/sessions/${s.id}`}
+                  className="card flex items-center justify-between p-4 hover:shadow-md transition-shadow"
+                >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-gray-900">{s.name}</p>
                   </div>
@@ -226,7 +269,7 @@ export default async function EventDetailPage({
               ))}
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
