@@ -1,3 +1,4 @@
+// attend/[token]/page.tsx
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
@@ -8,6 +9,7 @@ import {
   setCachedAttendee,
   hasSubmittedForScope,
   markSubmitted,
+  haversineDistance,          // ← ADDED
 } from '@/lib/utils'
 import { validateAttendanceForm } from '@/lib/validation'
 import type { TokenPayload } from '@/lib/types'
@@ -33,6 +35,9 @@ export default function AttendPage() {
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
   const locStarted = useRef(false)
 
+  // Event coordinates for geo‑fence
+  const [eventCoords, setEventCoords] = useState<{ lat: number; lng: number } | null>(null)
+
   const [form, setForm] = useState({
     full_name:   '',
     email:       '',
@@ -41,7 +46,6 @@ export default function AttendPage() {
     designation: '',
   })
 
-  // ── Geolocation ───────────────────────────────────────────────────────────
   function startLocationRequest() {
     if (!navigator.geolocation) {
       setLocState('unsupported')
@@ -76,7 +80,6 @@ export default function AttendPage() {
     )
   }
 
-  // ── Token validation (runs once on mount) ────────────────────────────────
   useEffect(() => {
     if (!locStarted.current) {
       locStarted.current = true
@@ -92,7 +95,7 @@ export default function AttendPage() {
         console.error('Failed to sync event statuses', e)
       }
       return supabase.rpc('validate_attendance_token', { p_token: token })
-    })().then(({ data, error }) => {
+    })().then(async ({ data, error }) => {
       if (!active) return
 
       if (error || !data) {
@@ -104,7 +107,19 @@ export default function AttendPage() {
       const payload = data as TokenPayload
       setEventData(payload)
 
-      // Pre-fill from local cache
+      // Fetch event coordinates if not already in payload
+      const eventId = payload._token_type === 'session' ? payload.event_id : payload.id
+      if (eventId) {
+        const { data: evt } = await supabase
+          .from('events')
+          .select('lat, lng')
+          .eq('id', eventId)
+          .single()
+        if (evt && evt.lat != null && evt.lng != null) {
+          setEventCoords({ lat: evt.lat, lng: evt.lng })
+        }
+      }
+
       const cached = getCachedAttendee()
       if (cached) {
         setForm({
@@ -126,7 +141,6 @@ export default function AttendPage() {
         return
       }
 
-      // 5-minute countdown
       setExpiry(300)
       timerRef.current = setInterval(() => {
         setExpiry(prev => {
@@ -150,7 +164,6 @@ export default function AttendPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs: Record<string, string> = {}
@@ -159,6 +172,22 @@ export default function AttendPage() {
       errs.location = locState === 'denied'
         ? 'Location access was denied. Enable it in your browser settings and tap Retry.'
         : 'Still fetching your location — please wait a moment.'
+    }
+
+    // ── Geo‑fence check ──────────────────────────────────────────────
+    if (location && eventCoords) {
+      const distance = haversineDistance(
+        location.lat,
+        location.lng,
+        eventCoords.lat,
+        eventCoords.lng
+      )
+      const MAX_DISTANCE = 500 // meters
+      if (distance > MAX_DISTANCE) {
+        errs.location = `You are too far from the event location (${distance.toFixed(0)}m away). Please move closer.`
+        setFieldErrors(errs)
+        return
+      }
     }
 
     const ve = validateAttendanceForm({
@@ -227,7 +256,6 @@ export default function AttendPage() {
   const eventTitle  = eventData?.event_name ?? eventData?.name ?? ''
   const sessionName = eventData?._token_type === 'session' ? eventData?.name : null
 
-  // ── Loading ───────────────────────────────────────────────────────────────
   if (pageState === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -236,7 +264,6 @@ export default function AttendPage() {
     )
   }
 
-  // ── Error ─────────────────────────────────────────────────────────────────
   if (pageState === 'error') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50 p-6 text-center">
@@ -249,7 +276,6 @@ export default function AttendPage() {
     )
   }
 
-  // ── Success ───────────────────────────────────────────────────────────────
   if (pageState === 'success') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-green-50 to-white p-6 text-center">
@@ -275,13 +301,11 @@ export default function AttendPage() {
     )
   }
 
-  // ── Form ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="card p-6 space-y-5">
 
-          {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-gray-900 leading-tight">{eventTitle}</h1>
@@ -298,7 +322,6 @@ export default function AttendPage() {
             )}
           </div>
 
-          {/* Location banner */}
           {locState === 'requesting' && (
             <div className="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs text-blue-800">
               <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
@@ -338,15 +361,10 @@ export default function AttendPage() {
             </div>
           )}
 
-          {/* Fields */}
           <form onSubmit={handleSubmit} className="space-y-3">
-
-            {/* Full name */}
             <div>
               <input
-                type="text"
-                name="full_name"
-                autoComplete="name"
+                type="text" name="full_name" autoComplete="name"
                 placeholder="Full name *"
                 value={form.full_name}
                 onChange={e => {
@@ -355,20 +373,14 @@ export default function AttendPage() {
                   if (fieldErrors.full_name) setFieldErrors(p => { const c = { ...p }; delete c.full_name; return c })
                 }}
                 className={`input-base ${fieldErrors.full_name ? 'border-red-300 focus:border-red-400' : ''}`}
-                maxLength={32}
-                required
+                maxLength={32} required
               />
-              {fieldErrors.full_name && (
-                <p className="mt-1 text-xs text-red-500">{fieldErrors.full_name}</p>
-              )}
+              {fieldErrors.full_name && <p className="mt-1 text-xs text-red-500">{fieldErrors.full_name}</p>}
             </div>
 
-            {/* Email */}
             <div>
               <input
-                type="email"
-                name="email"
-                autoComplete="email"
+                type="email" name="email" autoComplete="email"
                 placeholder="Email address *"
                 value={form.email}
                 onChange={e => {
@@ -379,17 +391,12 @@ export default function AttendPage() {
                 className={`input-base ${fieldErrors.email ? 'border-red-300 focus:border-red-400' : ''}`}
                 required
               />
-              {fieldErrors.email && (
-                <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>
-              )}
+              {fieldErrors.email && <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>}
             </div>
 
-            {/* Phone */}
             <div>
               <input
-                type="tel"
-                name="phone"
-                autoComplete="tel-national"
+                type="tel" name="phone" autoComplete="tel-national"
                 placeholder="Phone number *"
                 value={form.phone}
                 onChange={e => {
@@ -398,20 +405,14 @@ export default function AttendPage() {
                   if (fieldErrors.phone) setFieldErrors(p => { const c = { ...p }; delete c.phone; return c })
                 }}
                 className={`input-base ${fieldErrors.phone ? 'border-red-300 focus:border-red-400' : ''}`}
-                maxLength={15}
-                required
+                maxLength={15} required
               />
-              {fieldErrors.phone && (
-                <p className="mt-1 text-xs text-red-500">{fieldErrors.phone}</p>
-              )}
+              {fieldErrors.phone && <p className="mt-1 text-xs text-red-500">{fieldErrors.phone}</p>}
             </div>
 
-            {/* Institution */}
             <div>
               <input
-                type="text"
-                name="institution"
-                autoComplete="organization"
+                type="text" name="institution" autoComplete="organization"
                 placeholder="Institution *"
                 value={form.institution}
                 onChange={e => {
@@ -422,17 +423,12 @@ export default function AttendPage() {
                 className={`input-base ${fieldErrors.institution ? 'border-red-300 focus:border-red-400' : ''}`}
                 required
               />
-              {fieldErrors.institution && (
-                <p className="mt-1 text-xs text-red-500">{fieldErrors.institution}</p>
-              )}
+              {fieldErrors.institution && <p className="mt-1 text-xs text-red-500">{fieldErrors.institution}</p>}
             </div>
 
-            {/* Designation */}
             <div>
               <input
-                type="text"
-                name="designation"
-                autoComplete="organization-title"
+                type="text" name="designation" autoComplete="organization-title"
                 placeholder="Designation / Role *"
                 value={form.designation}
                 onChange={e => {
@@ -443,9 +439,7 @@ export default function AttendPage() {
                 className={`input-base ${fieldErrors.designation ? 'border-red-300 focus:border-red-400' : ''}`}
                 required
               />
-              {fieldErrors.designation && (
-                <p className="mt-1 text-xs text-red-500">{fieldErrors.designation}</p>
-              )}
+              {fieldErrors.designation && <p className="mt-1 text-xs text-red-500">{fieldErrors.designation}</p>}
             </div>
 
             {fieldErrors.location && (

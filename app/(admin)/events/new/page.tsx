@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { generateToken } from '@/lib/utils'
 import { Loader2, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
+import LocationPicker from '@/components/events/LocationPicker'   // NEW
 
 export default function NewEventPage() {
   const router = useRouter()
@@ -19,6 +20,11 @@ export default function NewEventPage() {
   const [defaultSessionName, setDefaultSessionName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Location picker toggle (optional)
+  const [showLocationPicker, setShowLocationPicker] = useState(false)
+  const [lat, setLat] = useState<number | null>(null)
+  const [lng, setLng] = useState<number | null>(null)
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -52,6 +58,8 @@ export default function NewEventPage() {
         has_sessions: hasSessions,
         qr_token: hasSessions ? null : token,
         created_by: user?.id,
+        lat: showLocationPicker ? lat : null,
+        lng: showLocationPicker ? lng : null,
       }).select('id').single()
 
       if (eventErr) throw eventErr
@@ -107,6 +115,41 @@ export default function NewEventPage() {
           <input required className="input-base" placeholder="Main Conference Hall"
             value={form.location} onChange={e => set('location', e.target.value)} />
         </div>
+
+        {/* ── Location toggle ──────────────────────────────────── */}
+        <div className="rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Pin location on map</p>
+              <p className="text-xs text-gray-500 mt-0.5">Optional – restrict check‑ins to a specific area</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowLocationPicker(v => !v);
+                if (!showLocationPicker) { setLat(null); setLng(null); }
+              }}
+              className={`relative h-6 w-11 rounded-full transition-colors ${showLocationPicker ? 'bg-indigo-600' : 'bg-gray-200'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${showLocationPicker ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
+
+          {showLocationPicker && (
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <LocationPicker
+                onLocationSelect={(latitude, longitude) => {
+                  setLat(latitude);
+                  setLng(longitude);
+                }}
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                Search for a place or click the map to pin. Attendees will need to be within 500 m.
+              </p>
+            </div>
+          )}
+        </div>
+
         <div>
           <label className="label">Description</label>
           <textarea className="input-base resize-none" rows={2} placeholder="Optional description"
