@@ -1,8 +1,9 @@
+// app/(auth)/login/LoginContent.tsx
 "use client";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BarChart3, Loader2, AlertCircle, Eye, EyeOff, ArrowLeft, Clock, MapPin, Users, ShieldCheck } from "lucide-react";
+import { BarChart3, Loader2, AlertCircle, Eye, EyeOff, ArrowLeft, Clock, MapPin, Users } from "lucide-react";
 
 type Step = "email" | "password" | "set-password";
 
@@ -161,7 +162,6 @@ export default function LoginContent() {
                 <p className="text-sm text-indigo-200">Comprehensive admin dashboard and reports</p>
               </div>
             </div>
-         
           </div>
         </div>
       </div>
@@ -174,7 +174,7 @@ export default function LoginContent() {
               <BarChart3 className="h-7 w-7 text-white" />
             </div>
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-gray-900">ClockIN</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Smart Attendance</h1>
               <p className="text-sm text-gray-500">Attendance Management</p>
             </div>
           </div>

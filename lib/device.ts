@@ -4,8 +4,8 @@
  * Stored in localStorage so repeat scans get auto-fill.
  */
 
-const CACHE_KEY = "clockin_device_cache";
-const FP_KEY    = "clockin_device_fp";
+const CACHE_KEY = "smart_attendance_device_cache";
+const FP_KEY    = "smart_attendance_device_fp";
 
 export interface DeviceCache {
   full_name: string;

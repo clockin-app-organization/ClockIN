@@ -1,6 +1,6 @@
 {
-  "name": "ClockIN",
-  "short_name": "ClockIN",
+  "name": "Smart Attendance",
+  "short_name": "Smart Attendance",
   "description": "Smart Attendance Management System",
   "start_url": "/",
   "display": "standalone",
@@ -25,14 +25,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "ClockIN Dashboard"
+      "label": "Smart Attendance Dashboard"
     },
     {
       "src": "/icons/screenshot-narrow.png",
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "ClockIN Mobile"
+      "label": "Smart Attendance Mobile"
     }
   ]
 }
