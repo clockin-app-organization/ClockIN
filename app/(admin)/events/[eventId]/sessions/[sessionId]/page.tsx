@@ -105,10 +105,6 @@ export default async function SessionDetailPage({
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="card p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Check-ins</p>
-          <p className="mt-1 text-3xl font-bold text-gray-900">{safeAttendees.length}</p>
-        </div>
         {session.started_at && (
           <div className="card p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Started</p>

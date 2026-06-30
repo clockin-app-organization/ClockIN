@@ -93,9 +93,9 @@ export default async function DashboardPage() {
   }
 
   const statCards = [
-    { label: "Total events",       value: stats.total_events,    icon: Calendar,      color: "text-blue-600 bg-blue-50"     },
+    { label: "Total events for Today",       value: stats.total_events,    icon: Calendar,      color: "text-blue-600 bg-blue-50"     },
     { label: "Active sessions",    value: stats.active_sessions, icon: Radio,         color: "text-green-600 bg-green-50"   },
-    { label: "Total check-ins",    value: stats.total_checkins,  icon: CheckCircle2,  color: "text-indigo-600 bg-indigo-50" },
+    { label: "Total Attendees for Today",    value: stats.total_checkins,  icon: CheckCircle2,  color: "text-indigo-600 bg-indigo-50" },
     { label: "Flagged duplicates", value: stats.duplicates,      icon: AlertTriangle, color: "text-amber-600 bg-amber-50"   },
   ];
 
@@ -105,7 +105,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
           <p className="mt-0.5 text-sm text-gray-500">
-            {isSuperAdmin ? "Welcome!" : "Overview of your events"}
+            {isSuperAdmin ? "Welcome!" : "Overview of your events for today "}
           </p>
         </div>
         <Link href="/events/new" className="btn-primary flex items-center gap-1.5">
@@ -158,7 +158,7 @@ export default async function DashboardPage() {
       {recentEvents?.length === 0 && (
         <div className="card flex flex-col items-center gap-3 py-16 text-center">
           <Calendar className="h-10 w-10 text-gray-300" />
-          <p className="font-medium text-gray-500">No events yet</p>
+          <p className="font-medium text-gray-500">There are no events for today start by creating one</p>
           <Link href="/events/new" className="btn-primary">Create your first event</Link>
         </div>
       )}

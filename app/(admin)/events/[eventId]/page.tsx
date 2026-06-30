@@ -140,17 +140,6 @@ export default async function EventDetailPage({
       {/* ── Non‑session event ─────────────────────────────── */}
       {!event.has_sessions ? (
         <div className="space-y-6">
-          <div className="card p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total check-ins</p>
-              <p className="mt-1 text-3xl font-bold text-gray-900">{safeAttendees.length}</p>
-            </div>
-            {event.status === "upcoming" && (
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                Starts {formatDate(event.event_date)} at {formatTime(event.start_time)}
-              </span>
-            )}
-          </div>
 
           {showQR && (
             <div className="card p-6">
