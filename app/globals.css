@@ -40,6 +40,10 @@ input, textarea, select { outline: none; }
     background-color: #fff;
     box-shadow: 0 0 0 3px #EEF2FF;
   }
+  &::-ms-reveal,
+  &::-webkit-credentials-auto-fill-button {
+    display: none;
+  }
 }
 
 @utility btn-primary {

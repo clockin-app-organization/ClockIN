@@ -141,7 +141,7 @@ export default function LoginContent() {
               </div>
               <div>
                 <h3 className="font-semibold text-white">Real-time Tracking</h3>
-                <p className="text-sm text-indigo-200">Precise clock-in and clock-out with timestamps</p>
+                <p className="text-sm text-indigo-200">Precise attendance tracking with timestamps</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
