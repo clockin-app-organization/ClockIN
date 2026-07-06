@@ -4,6 +4,7 @@ import { getSession } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Calendar, Radio, CheckCircle2, AlertTriangle, Plus } from "lucide-react";
 import type { DashboardStats, Event } from "@/lib/types";
+import MonthlyAttendeesChart from "@/components/analytics/MonthlyAttendeesChart";
 
 export const revalidate = 30;
 
@@ -128,6 +129,8 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      <MonthlyAttendeesChart />
 
       {recentEvents && recentEvents.length > 0 && (
         <div className="card overflow-hidden">

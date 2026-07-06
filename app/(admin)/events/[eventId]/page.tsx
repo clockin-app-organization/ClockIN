@@ -6,7 +6,7 @@ import QRDisplay from "@/components/qr/QRDisplay";
 import HeatMap from "@/components/attendance/HeatMap";
 import AttendeeTable from "@/components/attendance/AttendeeTable";
 import { formatDate, formatTime } from "@/lib/utils";
-import { MapPin, Clock, Calendar, Plus, AlertTriangle, Users, UserCheck } from "lucide-react";
+import { ChevronLeft, MapPin, Clock, Calendar, Plus, AlertTriangle, Users, UserCheck } from "lucide-react";
 import type { Session, Attendee, RevivalNote } from "@/lib/types";
 import DeleteEventButton from "@/components/events/DeleteEventButton";
 import DownloadAttendeesButton from "@/components/events/DownloadAttendeesButton";
@@ -82,6 +82,14 @@ export default async function EventDetailPage({
     <div className="space-y-6 p-4 lg:p-6">
 
       <EventStatusWatcher eventId={event.id} />
+
+      {/* Back button */}
+      {(event.status === "ended" || event.status === "archived") && (
+        <Link href="/archive"
+          className="mb-2 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+          <ChevronLeft className="h-3.5 w-3.5" /> Back to archive
+        </Link>
+      )}
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

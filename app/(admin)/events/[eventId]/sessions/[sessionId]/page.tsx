@@ -53,9 +53,9 @@ export default async function SessionDetailPage({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Link href={`/events/${eventId}`}
+          <Link href={session.status === "ended" || session.status === "archived" ? "/archive" : `/events/${eventId}`}
             className="mb-2 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
-            <ChevronLeft className="h-3.5 w-3.5" /> {session.event?.name}
+            <ChevronLeft className="h-3.5 w-3.5" /> {session.status === "ended" || session.status === "archived" ? "Back to archive" : session.event?.name}
           </Link>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-semibold text-gray-900">{session.name}</h1>
