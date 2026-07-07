@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { validateEventForm, type EventFormErrors } from '@/lib/validation'
 import { generateToken } from '@/lib/utils'
-import { Loader2 } from 'lucide-react'
+
 import type { Event } from '@/lib/types'
 
 interface Props {
@@ -166,7 +166,7 @@ export default function EventForm({ event, isEdit }: Props) {
       </div>
       {apiError && <p className="text-xs text-red-600">{apiError}</p>}
       <button type="submit" disabled={loading} className="btn-primary w-full">
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : isEdit ? 'Save changes' : 'Create event'}
+        {loading ? (isEdit ? 'Saving...' : 'Creating...') : isEdit ? 'Save changes' : 'Create event'}
       </button>
     </form>
   )

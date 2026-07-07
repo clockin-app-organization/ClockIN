@@ -23,6 +23,7 @@ export default function ManualAttendanceUpload({
   eventId: string;
   sessionId?: string;
 }) {
+  const [showSection, setShowSection] = useState(false);
   const [images, setImages] = useState<ManualAttendanceRecord[]>([]);
   const [uploading, setUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ManualAttendanceRecord | null>(null);
@@ -106,7 +107,6 @@ export default function ManualAttendanceUpload({
     e.stopPropagation();
     const url = getPublicUrl(imagePath);
     try {
-      // Fetch the image as a blob to force download
       const response = await fetch(url);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -118,7 +118,6 @@ export default function ManualAttendanceUpload({
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch {
-      // Fallback: open in new tab
       window.open(url, '_blank');
     }
   };
@@ -126,126 +125,140 @@ export default function ManualAttendanceUpload({
   return (
     <div className="card p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="section-title text-sm md:text-base">Manual Attendance</h2>
-        <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileChange}
-            className="hidden"
-            id={`manual-upload-${eventId}${sessionId || ''}`}
-          />
-          <label
-            htmlFor={`manual-upload-${eventId}${sessionId || ''}`}
-            className="btn-secondary inline-flex items-center gap-1 cursor-pointer"
-          >
-            {uploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Camera className="h-4 w-4" />
-            )}
-            <span className="hidden sm:inline">{uploading ? 'Uploading…' : 'Add Photo'}</span>
-            <span className="sm:hidden">{uploading ? '…' : 'Add'}</span>
-          </label>
-        </div>
-      </div>
-
-      {images.length === 0 && (
-        <p className="text-xs sm:text-sm text-gray-400 text-center py-4">
-          No manual attendance photos yet.
+        <p className="text-sm text-gray-700 font-medium">
+          {showSection ? 'Manual Attendance' : 'Did you take manual attendance?'}
         </p>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {images.map((img) => (
-          <div
-            key={img.id}
-            className="relative group border rounded-lg overflow-hidden cursor-pointer"
-            onClick={() => setSelectedImage(img)}
-          >
-            <Image
-              src={getPublicUrl(img.image_path)}
-              alt="Manual attendance"
-              width={320}
-              height={200}
-              className="w-full h-32 object-cover"
-              unoptimized
-            />
-
-            {/* Download button (top‑left) */}
-            <button
-              onClick={(e) => handleDownload(e, img.image_path)}
-              className="absolute top-1 left-1 bg-white/80 hover:bg-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Download className="h-3.5 w-3.5" />
-            </button>
-
-            {/* Delete button (top‑right) */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(img.id, img.image_path);
-              }}
-              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-
-            <div className="p-2 text-[10px] sm:text-xs text-gray-500">
-              {new Date(img.created_at).toLocaleString([], {
-                dateStyle: 'short',
-                timeStyle: 'short',
-              })}
-            </div>
-          </div>
-        ))}
+        <button
+          onClick={() => setShowSection(v => !v)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            showSection ? 'bg-indigo-600' : 'bg-gray-200'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              showSection ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
       </div>
 
-      {/* Lightbox modal */}
-      {selectedImage && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-          onClick={() => setSelectedImage(null)}
-        >
-          <div
-            className="relative max-w-3xl max-h-[90vh] bg-white rounded-lg overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute top-3 right-3 z-10 bg-white/80 rounded-full p-1 hover:bg-white"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            {/* Download button in modal */}
-            <button
-              onClick={(e) => handleDownload(e, selectedImage.image_path)}
-              className="absolute top-3 left-3 z-10 bg-white/80 rounded-full p-1 hover:bg-white"
-            >
-              <Download className="h-5 w-5" />
-            </button>
-
-            <Image
-              src={getPublicUrl(selectedImage.image_path)}
-              alt="Full view"
-              width={1200}
-              height={800}
-              className="w-full h-auto max-h-[80vh] object-contain"
-              unoptimized
+      {showSection && (
+        <>
+          <div className="flex items-center justify-end">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileChange}
+              className="hidden"
+              id={`manual-upload-${eventId}${sessionId || ''}`}
             />
-
-            <div className="p-3 text-xs sm:text-sm text-gray-600 text-center">
-              {new Date(selectedImage.created_at).toLocaleString([], {
-                dateStyle: 'full',
-                timeStyle: 'short',
-              })}
-            </div>
+            <label
+              htmlFor={`manual-upload-${eventId}${sessionId || ''}`}
+              className="btn-secondary inline-flex items-center gap-1 cursor-pointer"
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{uploading ? 'Uploading…' : 'Add Photo'}</span>
+              <span className="sm:hidden">{uploading ? '…' : 'Add'}</span>
+            </label>
           </div>
-        </div>
+
+          {images.length === 0 && (
+            <p className="text-xs sm:text-sm text-gray-400 text-center py-4">
+              No manual attendance photos yet.
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {images.map((img) => (
+              <div
+                key={img.id}
+                className="relative group border rounded-lg overflow-hidden cursor-pointer"
+                onClick={() => setSelectedImage(img)}
+              >
+                <Image
+                  src={getPublicUrl(img.image_path)}
+                  alt="Manual attendance"
+                  width={320}
+                  height={200}
+                  className="w-full h-32 object-cover"
+                  unoptimized
+                />
+
+                <button
+                  onClick={(e) => handleDownload(e, img.image_path)}
+                  className="absolute top-1 left-1 bg-white/80 hover:bg-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </button>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(img.id, img.image_path);
+                  }}
+                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+
+                <div className="p-2 text-[10px] sm:text-xs text-gray-500">
+                  {new Date(img.created_at).toLocaleString([], {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {selectedImage && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+              onClick={() => setSelectedImage(null)}
+            >
+              <div
+                className="relative max-w-3xl max-h-[90vh] bg-white rounded-lg overflow-hidden shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setSelectedImage(null)}
+                  className="absolute top-3 right-3 z-10 bg-white/80 rounded-full p-1 hover:bg-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+
+                <button
+                  onClick={(e) => handleDownload(e, selectedImage.image_path)}
+                  className="absolute top-3 left-3 z-10 bg-white/80 rounded-full p-1 hover:bg-white"
+                >
+                  <Download className="h-5 w-5" />
+                </button>
+
+                <Image
+                  src={getPublicUrl(selectedImage.image_path)}
+                  alt="Full view"
+                  width={1200}
+                  height={800}
+                  className="w-full h-auto max-h-[80vh] object-contain"
+                  unoptimized
+                />
+
+                <div className="p-3 text-xs sm:text-sm text-gray-600 text-center">
+                  {new Date(selectedImage.created_at).toLocaleString([], {
+                    dateStyle: 'full',
+                    timeStyle: 'short',
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
