@@ -6,7 +6,7 @@ import QRDisplay from "@/components/qr/QRDisplay";
 import HeatMap from "@/components/attendance/HeatMap";
 import AttendeeTable from "@/components/attendance/AttendeeTable";
 import { formatDate, formatTime } from "@/lib/utils";
-import { MapPin, Clock, Calendar, Plus, AlertTriangle, Users, UserCheck } from "lucide-react";
+import { ChevronLeft, MapPin, Clock, Calendar, Plus, AlertTriangle, Users, UserCheck } from "lucide-react";
 import type { Session, Attendee, RevivalNote } from "@/lib/types";
 import DeleteEventButton from "@/components/events/DeleteEventButton";
 import DownloadAttendeesButton from "@/components/events/DownloadAttendeesButton";
@@ -83,6 +83,14 @@ export default async function EventDetailPage({
 
       <EventStatusWatcher eventId={event.id} />
 
+      {/* Back button */}
+      {(event.status === "ended" || event.status === "archived") && (
+        <Link href="/archive"
+          className="mb-2 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+          <ChevronLeft className="h-3.5 w-3.5" /> Back to archive
+        </Link>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
@@ -140,17 +148,6 @@ export default async function EventDetailPage({
       {/* ── Non‑session event ─────────────────────────────── */}
       {!event.has_sessions ? (
         <div className="space-y-6">
-          <div className="card p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total check-ins</p>
-              <p className="mt-1 text-3xl font-bold text-gray-900">{safeAttendees.length}</p>
-            </div>
-            {event.status === "upcoming" && (
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                Starts {formatDate(event.event_date)} at {formatTime(event.start_time)}
-              </span>
-            )}
-          </div>
 
           {showQR && (
             <div className="card p-6">

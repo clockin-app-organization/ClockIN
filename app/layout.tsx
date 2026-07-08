@@ -7,14 +7,14 @@ import 'leaflet/dist/leaflet.css';
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "ClockIN",
+  title: "Smart Attendance",
   description: "Smart Attendance Management System",
-  applicationName: "ClockIN",
+  applicationName: "Smart Attendance",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "ClockIN",
+    title: "Smart Attendance",
   },
   formatDetection: { telephone: false },
   icons: {
@@ -41,8 +41,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <head>
-        {/* Next.js automatically injects the manifest link from metadata,
-            but keeping it explicit doesn't hurt. */}
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="bg-gray-50 antialiased">{children}</body>

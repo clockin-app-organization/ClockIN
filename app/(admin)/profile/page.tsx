@@ -91,12 +91,13 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-5 p-4 lg:p-6">
-      <div>
+    <div className="mx-auto max-w-4xl p-4 lg:p-6">
+      <div className="mb-5">
         <h1 className="text-xl font-semibold text-gray-900">My profile</h1>
         <p className="mt-0.5 text-sm text-gray-500">Update your info and password</p>
       </div>
 
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       {/* ── Personal info ── */}
       <form onSubmit={handleSaveProfile} className="card space-y-4 p-6">
         <h2 className="font-semibold text-gray-800">Personal info</h2>
@@ -200,6 +201,7 @@ export default function ProfilePage() {
           {pwSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update password'}
         </button>
       </form>
+      </div>
     </div>
   )
 }
