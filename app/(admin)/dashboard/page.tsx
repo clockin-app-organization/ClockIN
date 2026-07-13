@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSession } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Calendar, Radio, CheckCircle2, AlertTriangle, Plus } from "lucide-react";
+import { Calendar, Radio, CheckCircle2, Archive, Plus } from "lucide-react";
 import type { DashboardStats, Event } from "@/lib/types";
 import MonthlyAttendeesChart from "@/components/analytics/MonthlyAttendeesChart";
 
@@ -25,11 +25,14 @@ export default async function DashboardPage() {
 
   const isSuperAdmin = profile?.is_super_admin ?? false;
 
+  const today = new Date().toISOString().split("T")[0];
+
   let stats: DashboardStats;
+  let pastEvents = 0;
   let recentEvents: RecentEvent[] | null = null;
 
   if (isSuperAdmin) {
-    const [{ data: statsRow }, { data: events }] = await Promise.all([
+    const [{ data: statsRow }, { data: events }, { count: past }] = await Promise.all([
       supabase.from("dashboard_stats").select("*").single(),
       supabase
         .from("events")
@@ -37,8 +40,13 @@ export default async function DashboardPage() {
         .neq("status", "archived")
         .order("event_date", { ascending: false })
         .limit(5),
+      supabase
+        .from("events")
+        .select("*", { count: "exact", head: true })
+        .or(`status.eq.archived,event_date.lt.${today}`),
     ]);
-    stats        = statsRow ?? { total_events: 0, active_sessions: 0, total_checkins: 0, duplicates: 0 };
+    stats        = { ...(statsRow ?? { total_events: 0, active_sessions: 0, total_checkins: 0, past_events: 0 }), past_events: past ?? 0 };
+    pastEvents   = past ?? 0;
     recentEvents = events as RecentEvent[] | null;
   } else {
     const { data: myEvents } = await supabase
@@ -52,7 +60,7 @@ export default async function DashboardPage() {
       { count: totalEvents },
       { count: activeSessions },
       { count: totalCheckins },
-      { count: flagged },
+      { count: past },
       { data: events },
     ] = await Promise.all([
       supabase
@@ -73,13 +81,11 @@ export default async function DashboardPage() {
             .select("*", { count: "exact", head: true })
             .in("event_id", eventIds)
         : Promise.resolve(empty),
-      eventIds.length
-        ? supabase
-            .from("attendance_records")
-            .select("*", { count: "exact", head: true })
-            .in("event_id", eventIds)
-            .eq("is_flagged", true)
-        : Promise.resolve(empty),
+      supabase
+        .from("events")
+        .select("*", { count: "exact", head: true })
+        .eq("created_by", userId)
+        .or(`status.eq.archived,event_date.lt.${today}`),
       supabase
         .from("events")
         .select("id,name,status,event_date,has_sessions")
@@ -89,15 +95,16 @@ export default async function DashboardPage() {
         .limit(5),
     ]);
 
-    stats        = { total_events: totalEvents ?? 0, active_sessions: activeSessions ?? 0, total_checkins: totalCheckins ?? 0, duplicates: flagged ?? 0 };
+    stats        = { total_events: totalEvents ?? 0, active_sessions: activeSessions ?? 0, total_checkins: totalCheckins ?? 0, past_events: past ?? 0 };
+    pastEvents   = past ?? 0;
     recentEvents = events as RecentEvent[] | null;
   }
 
   const statCards = [
-    { label: "Total events for Today",       value: stats.total_events,    icon: Calendar,      color: "text-blue-600 bg-blue-50"     },
-    { label: "Active sessions",    value: stats.active_sessions, icon: Radio,         color: "text-green-600 bg-green-50"   },
-    { label: "Total Attendees for Today",    value: stats.total_checkins,  icon: CheckCircle2,  color: "text-indigo-600 bg-indigo-50" },
-    { label: "Flagged duplicates", value: stats.duplicates,      icon: AlertTriangle, color: "text-amber-600 bg-amber-50"   },
+    { label: "Total Daily Events",       value: stats.total_events,    icon: Calendar,     color: "text-blue-600 bg-blue-50"      },
+    { label: "Active sessions",    value: stats.active_sessions, icon: Radio,         color: "text-green-600 bg-green-50"    },
+    { label: "Total Daily Attendees",    value: stats.total_checkins,  icon: CheckCircle2, color: "text-indigo-600 bg-indigo-50"  },
+    { label: "Total Past Events", value: pastEvents,           icon: Archive,       color: "text-amber-600 bg-amber-50"    },
   ];
 
   return (

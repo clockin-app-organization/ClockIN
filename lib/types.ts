@@ -134,7 +134,7 @@ export interface DashboardStats {
   total_events:    number;
   active_sessions: number;
   total_checkins:  number;
-  duplicates:      number;
+  past_events:     number;
 }
 
 // ── CLUSTERED ATTENDEE (for heatmap) ────────────────────────
