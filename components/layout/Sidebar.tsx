@@ -1,34 +1,49 @@
 // components/layout/Sidebar.tsx
 "use client";
-import Link from "next/link";
+
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
-  LayoutDashboard, Calendar, Archive,
-  Users, User, X, Menu, BarChart3, LogOut, ClipboardList,
+  LayoutDashboard,
+  Calendar,
+  Archive,
+  Users,
+  User,
+  X,
+  Menu,
+  BarChart3,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
+import { Spinner } from "../ui/Spinner";
 
 function buildNav(isSuperAdmin: boolean) {
   return [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { label: "Events",    href: "/events",    icon: Calendar },
-    
-    { label: "Archive",   href: "/archive",   icon: Archive },
+    { label: "Events", href: "/events", icon: Calendar },
+
+    { label: "Archive", href: "/archive", icon: Archive },
     isSuperAdmin
-      ? { label: "Users",   href: "/users",   icon: Users }
+      ? { label: "Users", href: "/users", icon: Users }
       : { label: "Profile", href: "/profile", icon: User },
   ];
 }
 
 export default function Sidebar({ profile }: { profile: Profile }) {
+  const [loadingHref, setLoadingHref] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  useEffect(() => {
+    setLoadingHref(null);
+  }, [pathname]);
 
   const nav = buildNav(profile.is_super_admin ?? false);
 
@@ -45,7 +60,9 @@ export default function Sidebar({ profile }: { profile: Profile }) {
           <BarChart3 className="h-5 w-5 text-white" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-gray-900 leading-tight">Smart Attendance</p>
+          <p className="text-sm font-semibold text-gray-900 leading-tight">
+            Smart Attendance
+          </p>
           <p className="text-[11px] text-gray-400">
             {profile.is_super_admin ? "Super Admin" : "Admin"}
           </p>
@@ -63,20 +80,37 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         {nav.map(({ label, href, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
-            <Link
+            <button
               key={href}
-              href={href}
-              onClick={() => setOpen(false)}
+              type="button"
+              onClick={() => {
+                if (pathname === href) return;
+
+                setLoadingHref(href);
+                setOpen(false);
+
+                startTransition(() => {
+                  router.push(href);
+                });
+              }}
               className={cn(
-                "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all",
                 active
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
               )}
             >
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              {label}
-            </Link>
+              <Icon className="h-4 w-4 shrink-0" />
+
+              <span className="flex-1">{label}</span>
+
+              {loadingHref === href && isPending && (
+                <Spinner
+                  size="sm"
+                  className={active ? "text-white" : "text-indigo-600"}
+                />
+              )}
+            </button>
           );
         })}
       </nav>
@@ -91,7 +125,9 @@ export default function Sidebar({ profile }: { profile: Profile }) {
             <p className="truncate text-xs font-semibold text-gray-900">
               {profile.full_name || "Admin"}
             </p>
-            <p className="truncate text-[10px] text-gray-400">{profile.email}</p>
+            <p className="truncate text-[10px] text-gray-400">
+              {profile.email}
+            </p>
           </div>
         </div>
         <button
@@ -124,7 +160,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-60 border-r border-gray-200 bg-white transition-transform duration-200 lg:hidden",
-          open ? "translate-x-0" : "-translate-x-full"
+          open ? "translate-x-0" : "-translate-x-full",
         )}
       >
         {renderSidebarContent()}
