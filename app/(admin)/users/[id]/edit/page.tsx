@@ -1,20 +1,22 @@
 // app/(admin)/archive/page.tsx
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Archive, FolderOpen, RotateCcw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { Event, Session } from "@/lib/types";
-import { getSession } from "@/lib/supabase/server";
 
 export const revalidate = 0;
 
 export default async function ArchivePage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const user = await getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
 
   const supabase = await createClient();
-  const currentUserId = session.user.id;
+  const currentUserId = user.id;
 
   // Check if super admin
   const { data: profile } = await supabase

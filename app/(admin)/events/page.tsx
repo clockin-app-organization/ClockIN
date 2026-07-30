@@ -1,15 +1,19 @@
 // app/(admin)/events/page.tsx
 // Regular admins only see their own events; super admins see all.
-import { createClient } from "@/lib/supabase/server";
-import { getSession } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Plus, Calendar } from "lucide-react";
 import type { Event } from "@/lib/types";
+import { redirect } from "next/navigation";
 
 export const revalidate = 0;
 
 export default async function EventsPage() {
-  const session  = await getSession();
+  const user = await getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
   const supabase = await createClient();
 
   await supabase.rpc('sync_event_statuses');
@@ -18,7 +22,7 @@ export default async function EventsPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select("is_super_admin")
-    .eq("id", session!.user.id)
+    .eq("id", user.id)
     .single();
 
   const isSuperAdmin = profile?.is_super_admin ?? false;
@@ -31,7 +35,7 @@ export default async function EventsPage() {
     .order("event_date", { ascending: false });
 
   if (!isSuperAdmin) {
-    query = query.eq("created_by", session!.user.id);
+    query = query.eq("created_by", user.id);
   }
 
   const { data: events } = await query;
@@ -62,7 +66,7 @@ export default async function EventsPage() {
             <Link key={e.id} href={`/events/${e.id}`} className="card block p-5 transition-shadow hover:shadow-md">
               <div className="mb-3 flex items-start justify-between gap-2">
                 <h2 className="font-semibold text-gray-900 leading-tight">{e.name}</h2>
-                <span className={`badge-${e.status} flex-shrink-0`}>{e.status}</span>
+                <span className={`badge-${e.status} shrink-0`}>{e.status}</span>
               </div>
               <p className="mb-1 text-xs text-gray-500">{e.location}</p>
               <p className="text-xs text-gray-400">
