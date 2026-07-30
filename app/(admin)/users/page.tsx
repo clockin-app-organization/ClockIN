@@ -1,6 +1,5 @@
 // app/(admin)/users/page.tsx
-import { createClient } from "@/lib/supabase/server";
-import { getSession } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus, Users } from "lucide-react";
@@ -9,13 +8,15 @@ import type { Profile } from "@/lib/types";
 export const revalidate = 0;
 
 export default async function UsersPage() {
-  const session = await getSession();
+  const user = await getUser();
+  if (!user) return
+
   const supabase = await createClient();
 
   const { data: me } = await supabase
     .from("profiles")
     .select("is_super_admin")
-    .eq("id", session!.user.id)
+    .eq("id", user.id)
     .single();
 
   if (!me?.is_super_admin) redirect("/dashboard");

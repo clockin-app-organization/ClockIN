@@ -22,7 +22,7 @@ export default function OnboardingPage() {
     setLoading(true)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) return
 
     const { error: updateError } = await supabase
       .from('profiles')

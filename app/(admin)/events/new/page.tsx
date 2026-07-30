@@ -151,8 +151,8 @@ export default function NewEventPage() {
         </div>
 
         <div>
-          <label className="label">Description</label>
-          <textarea className="input-base resize-none" rows={2} placeholder="Optional description"
+          <label className="label">Event overview</label>
+          <textarea className="input-base resize-none" rows={2} placeholder="Provide a short overview, agenda, or important details about this event"
             value={form.description} onChange={e => set('description', e.target.value)} />
         </div>
 

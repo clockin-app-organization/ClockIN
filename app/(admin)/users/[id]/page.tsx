@@ -1,22 +1,36 @@
 // app/(admin)/users/[id]/page.tsx
-import { createClient } from "@/lib/supabase/server";
-import { getSession } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Mail, Phone, Building, Tag, Shield, CheckCircle, XCircle } from "lucide-react";
+import {
+  ChevronLeft,
+  Mail,
+  Phone,
+  Building,
+  Tag,
+  Shield,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 
 export const revalidate = 0;
 
-export default async function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function UserDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
-  const session = await getSession();
+  const user = await getUser();
+  if (!user) return
+  
   const supabase = await createClient();
 
   // Only super admins can view
   const { data: me } = await supabase
     .from("profiles")
     .select("is_super_admin")
-    .eq("id", session!.user.id)
+    .eq("id", user.id)
     .single();
 
   if (!me?.is_super_admin) redirect("/dashboard");
@@ -44,7 +58,9 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             {(profile.full_name || profile.email)[0].toUpperCase()}
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">{profile.full_name || "—"}</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {profile.full_name || "—"}
+            </h2>
             <p className="text-sm text-gray-500">{profile.email}</p>
           </div>
         </div>
@@ -83,15 +99,19 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           <div className="flex items-center gap-1.5">
             <Shield className="h-4 w-4 text-gray-400" />
             <span className="font-medium">Super admin:</span>
-            {profile.is_super_admin
-              ? <CheckCircle className="h-4 w-4 text-green-500" />
-              : <XCircle className="h-4 w-4 text-gray-300" />}
+            {profile.is_super_admin ? (
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            ) : (
+              <XCircle className="h-4 w-4 text-gray-300" />
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <span className="font-medium">Active:</span>
-            {profile.is_active
-              ? <span className="text-green-600">Yes</span>
-              : <span className="text-red-500">No</span>}
+            {profile.is_active ? (
+              <span className="text-green-600">Yes</span>
+            ) : (
+              <span className="text-red-500">No</span>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <span className="font-medium">First login:</span>
@@ -100,7 +120,8 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         </div>
 
         <p className="text-xs text-gray-400">
-          Created: {new Date(profile.created_at).toLocaleString()}<br />
+          Created: {new Date(profile.created_at).toLocaleString()}
+          <br />
           Updated: {new Date(profile.updated_at).toLocaleString()}
         </p>
 
