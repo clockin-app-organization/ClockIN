@@ -9,9 +9,7 @@ export const revalidate = 0;
 
 export default async function UsersPage() {
   const user = await getUser();
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) return
 
   const supabase = await createClient();
 

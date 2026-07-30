@@ -11,9 +11,7 @@ export const revalidate = 0;
 export default async function ArchivePage() {
   const user = await getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) return
 
   const supabase = await createClient();
   const currentUserId = user.id;

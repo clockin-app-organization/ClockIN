@@ -22,9 +22,8 @@ export default async function UserDetailPage({
 }) {
   const { id } = await params;
   const user = await getUser();
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) return
+  
   const supabase = await createClient();
 
   // Only super admins can view
