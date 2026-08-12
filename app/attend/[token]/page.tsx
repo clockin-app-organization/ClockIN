@@ -37,6 +37,7 @@ export default function AttendPage() {
 
   // Event coordinates for geo‑fence
   const [eventCoords, setEventCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [maxDistance, setMaxDistance] = useState(150)
 
   const [form, setForm] = useState({
     full_name:   '',
@@ -89,6 +90,17 @@ export default function AttendPage() {
     let active = true
 
     ;(async () => {
+      try {
+        const configRes = await fetch('/api/config')
+        if (configRes.ok) {
+          const { geoFenceMaxDistance } = await configRes.json()
+          if (typeof geoFenceMaxDistance === 'number' && geoFenceMaxDistance > 0) {
+            setMaxDistance(geoFenceMaxDistance)
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load geo-fence config', e)
+      }
       try {
         await supabase.rpc('sync_event_statuses')
       } catch (e) {
@@ -182,7 +194,7 @@ export default function AttendPage() {
         eventCoords.lat,
         eventCoords.lng
       )
-      const MAX_DISTANCE = 500 // meters
+      const MAX_DISTANCE = maxDistance
       if (distance > MAX_DISTANCE) {
         errs.location = `You are too far from the event location (${distance.toFixed(0)}m away). Please move closer.`
         setFieldErrors(errs)

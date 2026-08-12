@@ -30,6 +30,15 @@ export function formatDateTime(dt: string) {
   try { return format(parseISO(dt), "dd MMM yyyy, h:mm a"); } catch { return dt; }
 }
 
+export function statusLabel(status: string): string {
+  switch (status) {
+    case "active": return "ongoing";
+    case "ended":
+    case "archived": return "completed";
+    default: return status;
+  }
+}
+
 // Validation
 export function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

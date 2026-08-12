@@ -224,7 +224,7 @@ export default function DownloadAttendeesButton({ variant = "default", ...props 
   return (
     <button
       onClick={handleDownload}
-      className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/50"
     >
       <Download className="h-4 w-4" />
       Download list

@@ -1,4 +1,4 @@
-// app/(admin)/archive/page.tsx
+// app/(admin)/users/[id]/edit/page.tsx
 import { createClient, getUser } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
