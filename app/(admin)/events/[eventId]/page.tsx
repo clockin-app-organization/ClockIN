@@ -6,7 +6,7 @@ import QRDisplay from "@/components/qr/QRDisplay";
 import HeatMap from "@/components/attendance/HeatMap";
 import AttendeeTable from "@/components/attendance/AttendeeTable";
 import { formatDate, formatTime, statusLabel } from "@/lib/utils";
-import { ChevronLeft, MapPin, Clock, Calendar, Plus, AlertTriangle, Users, UserCheck } from "lucide-react";
+import { ChevronLeft, MapPin, Clock, Calendar, Plus, AlertTriangle, Users, UserCheck, RotateCcw } from "lucide-react";
 import type { Session, Attendee, RevivalNote } from "@/lib/types";
 import DeleteEventButton from "@/components/events/DeleteEventButton";
 import DownloadAttendeesButton from "@/components/events/DownloadAttendeesButton";
@@ -118,7 +118,7 @@ export default async function EventDetailPage({
             <Link href={`/events/${event.id}/edit`} className="btn-secondary">Edit</Link>
           )}
           {(event.status === "ended" || event.status === "archived") && (
-            <Link href={`/events/${event.id}/revive`} className="btn-primary">Revive</Link>
+            <Link href={`/events/${event.id}/revive`} className="btn-primary inline-flex items-center gap-1.5"><RotateCcw className="h-4 w-4" />Revive Session</Link>
           )}
           <DeleteEventButton eventId={event.id} eventName={event.name} />
         </div>
@@ -256,16 +256,23 @@ export default async function EventDetailPage({
             )}
             <div className="grid gap-3">
               {event.sessions?.map((s: Session) => (
-                <Link
+                <div
                   key={s.id}
-                  href={`/events/${event.id}/sessions/${s.id}`}
-                  className="card flex items-center justify-between p-4 hover:shadow-md transition-shadow"
+                  className="card flex items-center justify-between gap-3 p-4 hover:shadow-md transition-shadow"
                 >
-                  <div className="min-w-0 flex-1">
+                  <Link href={`/events/${event.id}/sessions/${s.id}`} className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{s.name}</p>
-                  </div>
+                  </Link>
                   <span className={`badge-${s.status} flex-shrink-0`}>{statusLabel(s.status)}</span>
-                </Link>
+                  {(s.status === "ended" || s.status === "archived") && (
+                    <Link
+                      href={`/events/${event.id}/sessions/${s.id}/revive`}
+                      className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" /> Revive Session
+                    </Link>
+                  )}
+                </div>
               ))}
             </div>
           </div>

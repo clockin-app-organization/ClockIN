@@ -5,7 +5,7 @@ import Link from "next/link";
 import QRDisplay from "@/components/qr/QRDisplay";
 import HeatMap from "@/components/attendance/HeatMap";
 import AttendeeTable from "@/components/attendance/AttendeeTable";
-import { ChevronLeft, AlertTriangle } from "lucide-react";
+import { ChevronLeft, AlertTriangle, RotateCcw } from "lucide-react";
 import { statusLabel } from "@/lib/utils";
 import type { Attendee, RevivalNote } from "@/lib/types";
 import StartSessionButton from "@/components/events/StartSessionButton";
@@ -80,7 +80,7 @@ export default async function SessionDetailPage({
           {session.status === "pending"  && <StartSessionButton sessionId={sessionId} />}
           {session.status === "active"   && <EndSessionButton   sessionId={sessionId} />}
           {(session.status === "ended" || session.status === "archived") && (
-  <Link href={`/events/${eventId}/sessions/${sessionId}/revive`} className="btn-primary">Revive</Link>
+  <Link href={`/events/${eventId}/sessions/${sessionId}/revive`} className="btn-primary inline-flex items-center gap-1.5"><RotateCcw className="h-4 w-4" />Revive Session</Link>
 )}
         </div>
       </div>
