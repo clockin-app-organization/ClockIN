@@ -14,6 +14,7 @@ import {
 import { validateAttendanceForm } from '@/lib/validation'
 import type { TokenPayload } from '@/lib/types'
 import { X, CheckCircle2, Loader2, Clock, MapPin, AlertCircle, RefreshCw } from 'lucide-react'
+import MdaCombobox from '@/components/ui/MdaCombobox'
 
 type LocState = 'requesting' | 'granted' | 'denied' | 'unsupported'
 
@@ -32,6 +33,7 @@ export default function AttendPage() {
   const [location,    setLocation]    = useState<{ lat: number; lng: number } | null>(null)
   const [locLabel,    setLocLabel]    = useState('')
   const [locState,    setLocState]    = useState<LocState>('requesting')
+  const [recentInstitution, setRecentInstitution] = useState('')
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
   const locStarted = useRef(false)
 
@@ -129,6 +131,7 @@ export default function AttendPage() {
           institution: cached.institution ?? '',
           designation: cached.designation ?? '',
         })
+        if (cached.institution) setRecentInstitution(cached.institution)
       }
 
       const scopeId = payload._token_type === 'session'
@@ -411,19 +414,17 @@ export default function AttendPage() {
             </div>
 
             <div>
-              <input
-                type="text" name="institution" autoComplete="organization"
+              <MdaCombobox
+                name="institution"
                 placeholder="Institution *"
                 value={form.institution}
-                onChange={e => {
-                  const v = e.target.value
+                recentValue={recentInstitution}
+                onChange={v => {
                   setForm(f => ({ ...f, institution: v }))
                   if (fieldErrors.institution) setFieldErrors(p => { const c = { ...p }; delete c.institution; return c })
                 }}
-                className={`input-base ${fieldErrors.institution ? 'border-red-300 focus:border-red-400' : ''}`}
-                required
+                error={fieldErrors.institution}
               />
-              {fieldErrors.institution && <p className="mt-1 text-xs text-red-500">{fieldErrors.institution}</p>}
             </div>
 
             <div>
