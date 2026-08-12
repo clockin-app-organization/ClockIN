@@ -3,7 +3,7 @@
 // /attend/[token] URLs. On Vercel this will be your production domain.
 'use client'
 import { QRCodeCanvas } from 'qrcode.react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Download, QrCode, X } from 'lucide-react'
 
 interface Props {
@@ -16,14 +16,44 @@ export default function QRDisplay({ token, label = 'Scan to attend', showDownloa
   const [copied, setCopied] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const url    = `${origin}/attend/${token}`
+  // Read window.location.origin only after mount so the first client render
+  // matches the server render (both start as ''), avoiding a hydration mismatch.
+  const [origin, setOrigin] = useState('')
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOrigin(window.location.origin)
+  }, [])
+
+  const url = `${origin}/attend/${token}`
 
   function copyLink() {
-    navigator.clipboard.writeText(url).then(() => {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      })
+      return
+    }
+
+    // Fallback for non-secure contexts (e.g. http://<local-ip>:3000 during
+    // network testing) where the Clipboard API isn't exposed by the browser.
+    const textarea = document.createElement('textarea')
+    textarea.value = url
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    try {
+      document.execCommand('copy')
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    })
+    } catch {
+      // Copy silently failed (e.g. execCommand unsupported) — the URL is
+      // still visible on screen for the admin to select/copy manually.
+    } finally {
+      document.body.removeChild(textarea)
+    }
   }
 
   function downloadQR() {
