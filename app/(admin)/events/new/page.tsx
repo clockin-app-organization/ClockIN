@@ -141,9 +141,7 @@ export default function NewEventPage() {
                 onLocationSelect={(latitude, longitude, addressName) => {
                   setLat(latitude);
                   setLng(longitude);
-                  if (addressName) {
-                    setForm(f => ({ ...f, location: addressName }));
-                  }
+                  setForm(f => ({ ...f, location: addressName || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}` }));
                 }}
               />
               <p className="text-xs text-gray-400 mt-2">

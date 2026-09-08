@@ -34,6 +34,7 @@ function buildHTML(props: Props, institution: string, coatOfArmsUrl: string): st
       <td>${esc(a.email ?? "")}</td>
       <td>${esc(a.designation ?? "")}</td>
       <td>${esc(a.institution ?? "")}</td>
+      <td>${esc(a.mda ?? "")}</td>
     </tr>`).join("");
 
   // Add blank rows to pad to at least 20
@@ -41,7 +42,7 @@ function buildHTML(props: Props, institution: string, coatOfArmsUrl: string): st
   const blankRows = Array.from({ length: blanks }, (_, i) => `
     <tr>
       <td class="center-align" style="color:#546e7a;font-weight:bold;">${attendees.length + i + 1}</td>
-      <td></td><td></td><td></td><td></td><td></td>
+      <td></td><td></td><td></td><td></td><td></td><td></td>
     </tr>`).join("");
 
   return `<!DOCTYPE html>
@@ -157,6 +158,7 @@ function buildHTML(props: Props, institution: string, coatOfArmsUrl: string): st
         <th class="col-em">Email</th>
         <th class="col-des">Designation</th>
         <th class="col-org">Institution</th>
+        <th class="col-org">MDA</th>
       </tr>
     </thead>
     <tbody>

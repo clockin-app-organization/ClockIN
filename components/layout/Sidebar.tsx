@@ -12,6 +12,7 @@ import {
   Menu,
   BarChart3,
   LogOut,
+  Building2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -23,9 +24,12 @@ function buildNav(isSuperAdmin: boolean) {
   return [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Events", href: "/events", icon: Calendar },
-    isSuperAdmin
-      ? { label: "Users", href: "/users", icon: Users }
-      : { label: "Profile", href: "/profile", icon: User },
+    ...(isSuperAdmin
+      ? [
+          { label: "MDAs", href: "/mdas", icon: Building2 },
+          { label: "Users", href: "/users", icon: Users },
+        ]
+      : [{ label: "Profile", href: "/profile", icon: User }]),
   ];
 }
 

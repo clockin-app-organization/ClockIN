@@ -7,7 +7,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const profile = await getProfile();
 
   if (!profile)               redirect("/login");
-  if (profile.is_first_login) redirect("/onboarding");
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">

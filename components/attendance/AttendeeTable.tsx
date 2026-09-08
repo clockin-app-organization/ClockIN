@@ -1,5 +1,5 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { RefreshCw, Eye, X, MapPin, Phone, Mail, Building2, BadgeInfo, Clock, ChevronLeft, ChevronRight, Search, Pencil, Trash2, Loader2 } from 'lucide-react'
@@ -25,15 +25,30 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
     phone: '',
     email: '',
     institution: '',
+    mda: '',
     designation: '',
     location: '',
   })
+  const [mdaQuery, setMdaQuery] = useState('')
+  const [mdaOpen,  setMdaOpen]  = useState(false)
+  const [mdas,     setMdas]     = useState<{ id: string; name: string }[]>([])
   const [editErrors, setEditErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [actionError, setActionError] = useState('')
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    supabase
+      .from('mdas')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .then(({ data }) => {
+        if (data) setMdas(data as { id: string; name: string }[])
+      })
+  }, [supabase])
 
   const rows = attendees.filter(a => !deletedIds.has(a.id))
 
@@ -43,6 +58,7 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
     return (
       a.full_name.toLowerCase().includes(q) ||
       (a.institution ?? '').toLowerCase().includes(q) ||
+      (a.mda ?? '').toLowerCase().includes(q) ||
       (a.designation ?? '').toLowerCase().includes(q) ||
       (a.phone ?? '').toLowerCase().includes(q) ||
       (a.email ?? '').toLowerCase().includes(q)
@@ -74,9 +90,11 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
       phone:        selected.phone,
       email:        selected.email || '',
       institution:  selected.institution || '',
+      mda:          selected.mda || '',
       designation:  selected.designation || '',
       location:     selected.location_label?.replace(/\s*\(Entered by Admin\)$/i, '') || '',
     })
+    setMdaQuery(selected.mda || '')
     setEditErrors({})
     setActionError('')
     setConfirmDelete(false)
@@ -101,6 +119,7 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
         phone:           editForm.phone.trim(),
         email:           editForm.email.trim(),
         institution:     editForm.institution.trim(),
+        mda:             editForm.mda.trim() || null,
         designation:     editForm.designation.trim(),
         location_label:  locationLabel,
       })
@@ -121,6 +140,7 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
       phone:           editForm.phone.trim(),
       email:           editForm.email.trim(),
       institution:     editForm.institution.trim(),
+      mda:             editForm.mda.trim() || null,
       designation:     editForm.designation.trim(),
       location_label:  locationLabel,
     })
@@ -198,6 +218,7 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
                   <th className="px-4 py-2.5 text-left w-10">#</th>
                   <th className="px-4 py-2.5 text-left">Name</th>
                   <th className="px-4 py-2.5 text-left">Institution</th>
+                  <th className="px-4 py-2.5 text-left">MDA</th>
                   <th className="px-4 py-2.5 text-left">Designation</th>
                   <th className="px-4 py-2.5 text-left">Time</th>
                   <th className="px-4 py-2.5 text-center w-16">View</th>
@@ -229,6 +250,7 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-gray-500 dark:text-slate-300">{a.institution ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-gray-500 dark:text-slate-300">{a.mda ?? '—'}</td>
                       <td className="px-4 py-2.5 text-gray-500 dark:text-slate-300">{a.designation ?? '—'}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-400 dark:text-slate-400 whitespace-nowrap">
                         {new Date(a.created_at).toLocaleTimeString([], {
@@ -422,6 +444,86 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
                     />
                     {editErrors.institution && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{editErrors.institution}</p>}
                   </div>
+                  <div className="relative">
+                    <label className="label">MDA (optional)</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        role="combobox"
+                        aria-expanded={mdaOpen}
+                        aria-controls="edit-mda-listbox"
+                        aria-autocomplete="list"
+                        autoComplete="off"
+                        placeholder={mdas.length ? 'Start typing to search…' : 'No MDAs available'}
+                        value={mdaQuery}
+                        onChange={e => {
+                          const v = e.target.value
+                          setMdaQuery(v)
+                          const exact = mdas.find(m => m.name.toLowerCase() === v.trim().toLowerCase())
+                          setEditForm(f => ({ ...f, mda: exact ? exact.name : v.trim() }))
+                          setMdaOpen(true)
+                        }}
+                        onFocus={() => setMdaOpen(true)}
+                        onBlur={() => setTimeout(() => setMdaOpen(false), 120)}
+                        className="input-base"
+                      />
+                      {editForm.mda && (
+                        <button
+                          type="button"
+                          aria-label="Clear MDA"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => {
+                            setEditForm(f => ({ ...f, mda: '' }))
+                            setMdaQuery('')
+                            setMdaOpen(false)
+                          }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    {mdaOpen && (
+                      <ul
+                        id="edit-mda-listbox"
+                        role="listbox"
+                        className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        {(() => {
+                          const q = mdaQuery.trim().toLowerCase()
+                          const matches = q ? mdas.filter(m => m.name.toLowerCase().includes(q)) : mdas
+                          if (matches.length === 0) {
+                            return (
+                              <li className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400">No MDA found matching “{mdaQuery.trim()}”.</li>
+                            )
+                          }
+                          return matches.map(m => (
+                            <li key={m.id}>
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={m.name === editForm.mda}
+                                onMouseDown={e => e.preventDefault()}
+                                onClick={() => {
+                                  setEditForm(f => ({ ...f, mda: m.name }))
+                                  setMdaQuery(m.name)
+                                  setMdaOpen(false)
+                                }}
+                                className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors hover:bg-indigo-50 dark:hover:bg-slate-700 ${
+                                  m.name === editForm.mda
+                                    ? 'bg-indigo-50 font-semibold text-indigo-700 dark:bg-slate-700 dark:text-white'
+                                    : 'text-gray-700 dark:text-slate-200'
+                                }`}
+                              >
+                                {m.name}
+                              </button>
+                            </li>
+                          ))
+                        })()}
+                      </ul>
+                    )}
+                  </div>
                   <div>
                     <label className="label">Designation *</label>
                     <input
@@ -480,6 +582,13 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
                     <div>
                       <p className="text-xs text-gray-400 dark:text-slate-400">Institution</p>
                       <p className="text-sm text-gray-900 dark:text-white">{selected.institution || '—'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Building2 className="mt-0.5 h-4 w-4 text-gray-400 dark:text-slate-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-400 dark:text-slate-400">MDA</p>
+                      <p className="text-sm text-gray-900 dark:text-white">{selected.mda || '—'}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">

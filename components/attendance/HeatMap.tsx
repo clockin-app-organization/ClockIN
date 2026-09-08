@@ -97,6 +97,7 @@ export default function HeatMap({ attendees, centerLat, centerLng }: Props) {
             <div style="font-size:12px;line-height:1.6;min-width:150px">
               <strong style="font-size:13px">${a.full_name}</strong><br/>
               ${a.institution ? `<span style="color:#6B7280">${a.institution}</span><br/>` : ''}
+              ${a.mda ? `<span style="color:#6B7280">${a.mda}</span><br/>` : ''}
               ${a.designation ? `<span style="color:#6B7280">${a.designation}</span><br/>` : ''}
               <span style="color:${color};font-weight:600">
                 ${isGreen ? '✓ Matched location' : '⚠ Different location'}
