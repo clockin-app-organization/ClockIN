@@ -6,5 +6,8 @@ export async function GET() {
   const parsed = Number(process.env.GEOFENCE_MAX_DISTANCE)
   const geoFenceMaxDistance =
     Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_DISTANCE
-  return NextResponse.json({ geoFenceMaxDistance })
+  return NextResponse.json(
+    { geoFenceMaxDistance },
+    { headers: { 'Cache-Control': 'public, max-age=300, s-maxage=900, stale-while-revalidate=3600' } },
+  )
 }

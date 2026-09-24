@@ -1,13 +1,9 @@
 // app/api/mdas/options/route.ts
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET() {
-  const admin = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll() { return [] }, setAll() {} } }
-  );
+  const admin = createAdminClient();
 
   const { data, error } = await admin
     .from("mdas")
@@ -19,5 +15,8 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ mdas: data });
+  return NextResponse.json(
+    { mdas: data },
+    { headers: { "Cache-Control": "public, max-age=300, s-maxage=900, stale-while-revalidate=3600" } },
+  );
 }

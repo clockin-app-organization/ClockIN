@@ -1,4 +1,4 @@
-// attend/[token]/page.tsx
+
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
@@ -9,13 +9,15 @@ import {
   setCachedAttendee,
   hasSubmittedForScope,
   markSubmitted,
-  haversineDistance,          // ← ADDED
+  haversineDistance,
 } from '@/lib/utils'
 import { validateAttendanceForm } from '@/lib/validation'
 import type { TokenPayload } from '@/lib/types'
-import { X, CheckCircle2, Loader2, Clock, MapPin, AlertCircle, RefreshCw, Search } from 'lucide-react'
+import { X, CheckCircle2, Loader2, MapPin, AlertCircle, RefreshCw, Search } from 'lucide-react'
+
 
 type LocState = 'requesting' | 'granted' | 'denied' | 'unsupported'
+type MdaLoadState = 'idle' | 'loading' | 'ready' | 'error'
 
 const supabase = createClient()
 
@@ -28,15 +30,12 @@ export default function AttendPage() {
   const [fatalError,  setFatalError]  = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting,  setSubmitting]  = useState(false)
-  const [expiry,      setExpiry]      = useState<number | null>(null)
   const [location,    setLocation]    = useState<{ lat: number; lng: number } | null>(null)
   const [locLabel,    setLocLabel]    = useState('')
   const [locState,    setLocState]    = useState<LocState>('requesting')
-  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
   const locStarted = useRef(false)
 
-  // Event coordinates for geo‑fence
-  const [eventCoords, setEventCoords] = useState<{ lat: number; lng: number } | null>(null)
+
   const [maxDistance, setMaxDistance] = useState(150)
 
   const [form, setForm] = useState({
@@ -48,10 +47,14 @@ export default function AttendPage() {
     designation: '',
   })
 
-  // MDA combobox (mirrors the add-admin MDA picker)
-  const [mdas,        setMdas]        = useState<{ id: string; name: string }[]>([])
-  const [mdaQuery,    setMdaQuery]    = useState('')
-  const [mdaOpen,     setMdaOpen]     = useState(false)
+
+  const [isMda,        setIsMda]        = useState(false)
+  const [mdas,         setMdas]         = useState<{ id: string; name: string }[]>([])
+  const [mdaQuery,     setMdaQuery]     = useState('')
+  const [mdaOpen,      setMdaOpen]      = useState(false)
+  const [mdaLoadState, setMdaLoadState] = useState<MdaLoadState>('idle')
+  const mdaLoadTimerRef = useRef<number | null>(null)
+  const mdaRequestStartedRef = useRef(false)
 
   function startLocationRequest() {
     if (!navigator.geolocation) {
@@ -62,10 +65,15 @@ export default function AttendPage() {
     navigator.geolocation.getCurrentPosition(
       pos => {
         const { latitude: lat, longitude: lng } = pos.coords
+        const coordinateLabel = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
         setLocation({ lat, lng })
+        setLocLabel(coordinateLabel)
         setLocState('granted')
+        const controller = new AbortController()
+        const timeout = window.setTimeout(() => controller.abort(), 2000)
         fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+          { signal: controller.signal },
         )
           .then(r => r.json())
           .then(d => {
@@ -75,9 +83,10 @@ export default function AttendPage() {
               addr.city ?? addr.town   ?? addr.village,
               addr.country,
             ].filter(Boolean)
-            setLocLabel(parts.length ? parts.join(', ') : `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+            setLocLabel(parts.length ? parts.join(', ') : coordinateLabel)
           })
-          .catch(() => setLocLabel(`${lat.toFixed(5)}, ${lng.toFixed(5)}`))
+          .catch(() => setLocLabel(coordinateLabel))
+          .finally(() => window.clearTimeout(timeout))
       },
       err => {
         console.warn('[location] error', err.code, err.message)
@@ -85,6 +94,45 @@ export default function AttendPage() {
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
     )
+  }
+
+  async function loadMdas() {
+    if (mdaRequestStartedRef.current) return
+
+    mdaRequestStartedRef.current = true
+
+    try {
+      const response = await fetch('/api/mdas/options')
+      if (!response.ok) throw new Error('Failed to load MDA options')
+
+      const { mdas: mdaList } = await response.json()
+      if (!Array.isArray(mdaList)) throw new Error('Invalid MDA options response')
+
+      setMdas(mdaList)
+      setMdaLoadState('ready')
+    } catch (error) {
+      console.error('Failed to load MDA options', error)
+      mdaRequestStartedRef.current = false
+      setMdaLoadState('error')
+    }
+  }
+
+  function scheduleMdaLoad() {
+    if (mdaLoadState === 'ready' || mdaRequestStartedRef.current || mdaLoadTimerRef.current) return
+
+    setMdaLoadState('loading')
+    mdaLoadTimerRef.current = window.setTimeout(() => {
+      mdaLoadTimerRef.current = null
+      void loadMdas()
+    }, 250)
+  }
+
+  function cancelMdaLoad() {
+    if (!mdaLoadTimerRef.current) return
+
+    window.clearTimeout(mdaLoadTimerRef.current)
+    mdaLoadTimerRef.current = null
+    setMdaLoadState('idle')
   }
 
   useEffect(() => {
@@ -95,102 +143,76 @@ export default function AttendPage() {
 
     let active = true
 
-    ;(async () => {
-      try {
-        const configRes = await fetch('/api/config')
-        if (configRes.ok) {
-          const { geoFenceMaxDistance } = await configRes.json()
-          if (typeof geoFenceMaxDistance === 'number' && geoFenceMaxDistance > 0) {
-            setMaxDistance(geoFenceMaxDistance)
-          }
+    void fetch('/api/config')
+      .then(async response => {
+        if (!response.ok) return
+
+        const { geoFenceMaxDistance } = await response.json()
+        if (active && typeof geoFenceMaxDistance === 'number' && geoFenceMaxDistance > 0) {
+          setMaxDistance(geoFenceMaxDistance)
         }
-      } catch (e) {
-        console.error('Failed to load geo-fence config', e)
-      }
+      })
+      .catch(error => {
+        console.error('Failed to load geo-fence config', error)
+      })
+
+    async function initialize() {
       try {
-        const mdaRes = await fetch('/api/mdas/options')
-        if (mdaRes.ok) {
-          const { mdas: mdaList } = await mdaRes.json()
-          if (Array.isArray(mdaList)) setMdas(mdaList)
+        const { data, error } = await supabase.rpc('validate_attendance_token', { p_token: token })
+        if (!active) return
+
+        if (error || !data) {
+          setFatalError('This QR code is invalid or has expired.')
+          setPageState('error')
+          return
         }
-      } catch (e) {
-        console.error('Failed to load MDA options', e)
-      }
-      try {
-        await supabase.rpc('sync_event_statuses')
-      } catch (e) {
-        console.error('Failed to sync event statuses', e)
-      }
-      return supabase.rpc('validate_attendance_token', { p_token: token })
-    })().then(async ({ data, error }) => {
-      if (!active) return
 
-      if (error || !data) {
-        setFatalError('This QR code is invalid or has expired.')
-        setPageState('error')
-        return
-      }
+        const payload = data as TokenPayload
+        setEventData(payload)
 
-      const payload = data as TokenPayload
-      setEventData(payload)
+        const cached = getCachedAttendee()
+        if (cached) {
+          setForm({
+            full_name:   cached.full_name   ?? '',
+            email:       cached.email       ?? '',
+            phone:       cached.phone       ?? '',
+            institution: cached.institution ?? '',
+            mda:         '',
+            designation: cached.designation ?? '',
+          })
+        }
 
-      // Fetch event coordinates if not already in payload
-      const eventId = payload._token_type === 'session' ? payload.event_id : payload.id
-      if (eventId) {
-        const { data: evt } = await supabase
-          .from('events')
-          .select('lat, lng')
-          .eq('id', eventId)
-          .single()
-        if (evt && evt.lat != null && evt.lng != null) {
-          setEventCoords({ lat: evt.lat, lng: evt.lng })
+        const scopeId = payload._token_type === 'session'
+          ? (payload.session_id ?? payload.id)
+          : payload.id
+
+        if (hasSubmittedForScope(scopeId)) {
+          setFatalError('You have already checked in for this event.')
+          setPageState('error')
+          return
+        }
+
+        setPageState('form')
+      } catch (error) {
+        console.error('Failed to validate attendance token', error)
+        if (active) {
+          setFatalError('Unable to verify this QR code. Please try again.')
+          setPageState('error')
         }
       }
+    }
 
-      const cached = getCachedAttendee()
-      if (cached) {
-        setForm({
-          full_name:   cached.full_name   ?? '',
-          email:       cached.email       ?? '',
-          phone:       cached.phone       ?? '',
-          institution: cached.institution ?? '',
-          mda:         cached.mda         ?? '',
-          designation: cached.designation ?? '',
-        })
-      }
-
-      const scopeId = payload._token_type === 'session'
-        ? (payload.session_id ?? payload.id)
-        : payload.id
-
-      if (hasSubmittedForScope(scopeId)) {
-        setFatalError('You have already checked in for this event.')
-        setPageState('error')
-        return
-      }
-
-      setExpiry(300)
-      timerRef.current = setInterval(() => {
-        setExpiry(prev => {
-          if (!prev || prev <= 1) {
-            clearInterval(timerRef.current!)
-            setFatalError('QR session expired. Please scan again.')
-            setPageState('error')
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-
-      setPageState('form')
-    })
+    void initialize()
 
     return () => {
       active = false
-      if (timerRef.current) clearInterval(timerRef.current)
+      if (mdaLoadTimerRef.current) window.clearTimeout(mdaLoadTimerRef.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
+
+  const eventLat = eventData?._token_type === 'session' ? eventData.event_lat : eventData?.lat
+  const eventLng = eventData?._token_type === 'session' ? eventData.event_lng : eventData?.lng
+  const eventCoords = eventLat != null && eventLng != null ? { lat: eventLat, lng: eventLng } : null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -202,7 +224,7 @@ export default function AttendPage() {
         : 'Still fetching your location — please wait a moment.'
     }
 
-    // ── Geo‑fence check ──────────────────────────────────────────────
+
     if (location && eventCoords) {
       const distance = haversineDistance(
         location.lat,
@@ -242,24 +264,28 @@ export default function AttendPage() {
       ? (eventData.session_id ?? eventData.id)
       : eventData.id
 
-    const { error: submitError } = await supabase.from('attendees').insert({
-      event_id:           eventData._token_type === 'session' ? eventData.event_id! : eventData.id,
-      session_id:         eventData._token_type === 'session' ? (eventData.session_id ?? eventData.id) : null,
-      full_name:          form.full_name.trim(),
-      email:              form.email.trim(),
-      phone:              form.phone.trim(),
-      institution:        form.institution.trim(),
-      mda:                form.mda.trim() || null,
-      designation:        form.designation.trim(),
-      device_fingerprint: getOrCreateDeviceId(),
-      qr_token_used:      token,
-      lat:                location!.lat,
-      lng:                location!.lng,
-      location_label:     locLabel || null,
-    })
+    const response = await fetch('/api/attendance/check-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        full_name:          form.full_name.trim(),
+        email:              form.email.trim(),
+        phone:              form.phone.trim(),
+        institution:        form.institution.trim(),
+        mda:                isMda ? form.mda.trim() || null : null,
+        designation:        form.designation.trim(),
+        device_fingerprint: getOrCreateDeviceId(),
+        lat:                location!.lat,
+        lng:                location!.lng,
+        location_label:     locLabel || null,
+      }),
+    }).catch(() => null)
 
-    if (submitError) {
-      let msg = submitError.message
+    const result = response ? await response.json().catch(() => null) : null
+
+    if (!response?.ok) {
+      let msg = result?.error || 'Unable to record your attendance. Please try again.'
       if (msg.includes('duplicate') || msg.includes('unique')) {
         if (msg.includes('phone')) {
           msg = 'This phone number has already been used for this event/session.'
@@ -274,14 +300,13 @@ export default function AttendPage() {
       return
     }
 
-    setCachedAttendee(form)
+    setCachedAttendee({ ...form, mda: isMda ? form.mda : '' })
     markSubmitted(scopeId)
-    if (timerRef.current) clearInterval(timerRef.current)
     setPageState('success')
     setSubmitting(false)
   }
 
-  const timeLeft    = expiry !== null ? `${Math.floor(expiry / 60)}:${String(expiry % 60).padStart(2, '0')}` : null
+
   const eventTitle  = eventData?.event_name ?? eventData?.name ?? ''
   const sessionName = eventData?._token_type === 'session' ? eventData?.name : null
 
@@ -342,13 +367,6 @@ export default function AttendPage() {
                 <p className="mt-0.5 text-sm text-indigo-600 font-medium">Session: {sessionName}</p>
               )}
             </div>
-            {timeLeft && (
-              <div className={`flex items-center gap-1 text-sm font-medium flex-shrink-0 ${
-                expiry && expiry < 60 ? 'text-red-600' : 'text-orange-500'
-              }`}>
-                <Clock className="h-4 w-4" /> {timeLeft}
-              </div>
-            )}
           </div>
 
           {locState === 'requesting' && (
@@ -455,18 +473,44 @@ export default function AttendPage() {
               {fieldErrors.institution && <p className="mt-1 text-xs text-red-500">{fieldErrors.institution}</p>}
             </div>
 
-            {/* MDA combobox — optional, mirrors the add-admin MDA picker */}
-            <div className="relative">
+
+            <div className="space-y-3">
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800">
+                <span>
+                  <span className="block text-sm font-medium text-gray-900 dark:text-white">I represent an MDA</span>
+                  <span className="block text-xs text-gray-500 dark:text-slate-400">Enable this only if you are checking in on behalf of an MDA.</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={isMda}
+                  onChange={e => {
+                    const checked = e.target.checked
+                    setIsMda(checked)
+                    if (!checked) {
+                      setForm(f => ({ ...f, mda: '' }))
+                      setMdaQuery('')
+                      setMdaOpen(false)
+                      cancelMdaLoad()
+                    }
+                  }}
+                  className="peer sr-only"
+                />
+                <span className="relative h-6 w-11 flex-shrink-0 rounded-full bg-gray-300 transition-colors peer-checked:bg-indigo-600 peer-checked:[&>span]:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500 peer-focus-visible:ring-offset-2 dark:bg-slate-600">
+                  <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform" />
+                </span>
+              </label>
+
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-400" />
                 <input
                   type="text"
                   role="combobox"
-                  aria-expanded={mdaOpen}
+                  aria-expanded={isMda && mdaOpen}
                   aria-controls="attendee-mda-listbox"
                   aria-autocomplete="list"
                   autoComplete="off"
-                  placeholder={mdas.length ? 'MDA (optional) — start typing…' : 'MDA list unavailable'}
+                  disabled={!isMda}
+                  placeholder={mdas.length ? 'Start typing and select your MDA' : 'MDA'}
                   value={mdaQuery}
                   onChange={e => {
                     const v = e.target.value
@@ -475,10 +519,17 @@ export default function AttendPage() {
                     setForm(f => ({ ...f, mda: exact ? exact.name : v.trim() }))
                     if (fieldErrors.mda) setFieldErrors(p => { const c = { ...p }; delete c.mda; return c })
                     setMdaOpen(true)
+                    scheduleMdaLoad()
                   }}
-                  onFocus={() => setMdaOpen(true)}
-                  onBlur={() => setTimeout(() => setMdaOpen(false), 120)}
-                  className="input-base pl-9"
+                  onFocus={() => {
+                    setMdaOpen(true)
+                    scheduleMdaLoad()
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setMdaOpen(false), 120)
+                    cancelMdaLoad()
+                  }}
+                  className="input-base pl-9 disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 {form.mda && (
                   <button
@@ -501,6 +552,7 @@ export default function AttendPage() {
                 <ul
                   id="attendee-mda-listbox"
                   role="listbox"
+
                   className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
                 >
                   {(() => {
