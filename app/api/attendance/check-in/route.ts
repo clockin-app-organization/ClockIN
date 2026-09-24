@@ -118,21 +118,33 @@ export async function POST(request: Request) {
     )
   }
 
-  const { error: insertError } = await admin.from('attendees').insert({
+  const insertData: Record<string, any> = {
     event_id:           eventId,
     session_id:         sessionId,
     full_name:          full_name.trim(),
     email:              email.trim(),
     phone:              phone.trim(),
     institution:        institution.trim(),
-    mda:                mda?.trim() || null,
     designation:        designation.trim(),
     device_fingerprint,
     qr_token_used:      token,
     lat,
     lng,
     location_label:     location_label || null,
-  })
+  }
+
+  const trimmedMda = mda?.trim()
+  if (trimmedMda) {
+    insertData.mda = trimmedMda
+  }
+
+  let { error: insertError } = await admin.from('attendees').insert(insertData)
+
+  if (insertError && insertData.mda && (insertError.message.includes('mda') || insertError.message.includes('schema cache'))) {
+    delete insertData.mda
+    const retry = await admin.from('attendees').insert(insertData)
+    insertError = retry.error
+  }
 
   if (insertError) {
     const msg = insertError.message
