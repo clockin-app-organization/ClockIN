@@ -23,30 +23,31 @@ export default async function SessionDetailPage({
   const { eventId, sessionId } = await params;
   const supabase = await createClient();
 
-  const { data: session } = await supabase
-    .from("sessions")
-    .select("*, event:events(id,name,location,event_date,lat,lng,status)")
-    .eq("id", sessionId)
-    .single();
+  const [{ data: session }, { data: attendees }, { data: revivalNotes }] =
+    await Promise.all([
+      supabase
+        .from("sessions")
+        .select("*, event:events(id,name,location,event_date,lat,lng,status)")
+        .eq("id", sessionId)
+        .single(),
+      supabase
+        .from("attendees")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("revival_notes")
+        .select("*")
+        .eq("scope_type", "session")
+        .eq("scope_id", sessionId)
+        .order("created_at", { ascending: false }),
+    ]);
 
   if (!session) notFound();
 
-  const { data: attendees } = await supabase
-    .from("attendees")
-    .select("*")
-    .eq("session_id", sessionId)
-    .order("created_at", { ascending: false });
-
-  const { data: revivalNotes } = await supabase
-    .from("revival_notes")
-    .select("*")
-    .eq("scope_type", "session")
-    .eq("scope_id", sessionId)
-    .order("created_at", { ascending: false });
-
   const safeAttendees: Attendee[] = attendees ?? [];
-  const safeNotes: RevivalNote[]  = revivalNotes ?? [];
-  const latestNote                = safeNotes[0] ?? null;
+  const safeNotes: RevivalNote[] = revivalNotes ?? [];
+  const latestNote = safeNotes[0] ?? null;
 
   return (
     <div className="space-y-6 p-4 lg:p-6">

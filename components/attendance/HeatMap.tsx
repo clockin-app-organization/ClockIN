@@ -5,6 +5,8 @@ import type { Map as LeafletMap } from 'leaflet'
 import type { Attendee } from '@/lib/types'
 import { clusterAttendees } from '@/lib/utils'
 
+import 'leaflet/dist/leaflet.css'
+
 interface Props {
   attendees: Attendee[]
   centerLat?: number
@@ -20,22 +22,10 @@ export default function HeatMap({ attendees, centerLat, centerLng }: Props) {
 
     let cancelled = false
 
-    // Teardown before rebuild
     if (mapInstanceRef.current) {
       mapInstanceRef.current.remove()
       mapInstanceRef.current = null
     }
-
-    // Load CSS first, then module
-    const ensureCSS = () => {
-      if (document.getElementById('leaflet-css')) return
-      const link = document.createElement('link')
-      link.id   = 'leaflet-css'
-      link.rel  = 'stylesheet'
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-      document.head.appendChild(link)
-    }
-    ensureCSS()
 
     import('leaflet').then((L) => {
       if (cancelled || !containerRef.current) return
