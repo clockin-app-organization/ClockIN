@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { validateAttendanceToken } from '@/lib/token-validation'
 
 const DEFAULT_MAX_DISTANCE = 150
 
@@ -57,10 +58,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  const { data: payload, error: tokenError } = await admin.rpc(
-    'validate_attendance_token',
-    { p_token: token },
-  )
+  const { data: payload, error: tokenError } = await validateAttendanceToken(token)
 
   if (tokenError || !payload) {
     return NextResponse.json(

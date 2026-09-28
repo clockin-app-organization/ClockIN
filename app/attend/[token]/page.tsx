@@ -2,7 +2,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import {
   getOrCreateDeviceId,
   getCachedAttendee,
@@ -18,8 +17,6 @@ import { X, CheckCircle2, Loader2, MapPin, AlertCircle, RefreshCw, Search } from
 
 type LocState = 'requesting' | 'granted' | 'denied' | 'unsupported'
 type MdaLoadState = 'idle' | 'loading' | 'ready' | 'error'
-
-const supabase = createClient()
 
 export default function AttendPage() {
   const params = useParams()
@@ -153,16 +150,28 @@ export default function AttendPage() {
 
     async function initialize() {
       try {
-        const { data, error } = await supabase.rpc('validate_attendance_token', { p_token: token })
+        const response = await fetch(`/api/token/validate?token=${encodeURIComponent(token)}`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        })
         if (!active) return
 
-        if (error || !data) {
+        if (!response.ok) {
           setFatalError('This QR code is invalid or has expired.')
           setPageState('error')
           return
         }
 
-        const payload = data as TokenPayload
+        const resData = await response.json().catch(() => null)
+        if (!active) return
+
+        if (!resData?.valid || !resData?.data) {
+          setFatalError('This QR code is invalid or has expired.')
+          setPageState('error')
+          return
+        }
+
+        const payload = resData.data as TokenPayload
         setEventData(payload)
 
         const cached = getCachedAttendee()
