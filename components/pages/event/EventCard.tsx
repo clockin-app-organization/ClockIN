@@ -25,6 +25,7 @@ export default function EventCard({ event }: EventCardProps) {
   return (
     <Link
       href={`/events/${event.id}`}
+      prefetch={false}
       className={
         `group block rounded-2xl border p-5 transition-all hover:border-indigo-200 hover:shadow-sm
          border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-800`

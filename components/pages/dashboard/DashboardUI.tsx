@@ -191,6 +191,7 @@ export default function DashboardUI({
                 <Link
                   key={event.id}
                   href={`/events/${event.id}`}
+                  prefetch={false}
                   className="
                     group flex items-center justify-between
                     gap-3 rounded-xl border

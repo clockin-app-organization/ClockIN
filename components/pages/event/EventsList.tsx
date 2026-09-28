@@ -207,6 +207,7 @@ export default function EventsList({ events, sessions, isSuperAdmin }: Props) {
 
             <Link
               href={item.href}
+              prefetch={false}
               className="ml-3 flex shrink-0 items-center gap-1 rounded-xl border px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/60"
             >
               <Eye className="h-4 w-4" />

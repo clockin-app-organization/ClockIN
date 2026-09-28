@@ -69,6 +69,7 @@ export default function MdasList({ mdas }: { mdas: Mda[] }) {
                 </div>
                 <Link
                   href={`/mdas/${m.id}`}
+                  prefetch={false}
                   className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100"
                 >
                   <Eye className="h-3.5 w-3.5" />
