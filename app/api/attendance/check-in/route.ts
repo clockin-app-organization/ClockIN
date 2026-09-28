@@ -4,6 +4,22 @@ import { validateAttendanceToken } from '@/lib/token-validation'
 
 const DEFAULT_MAX_DISTANCE = 150
 
+type AttendeeInsertData = {
+  event_id: string
+  session_id: string | null
+  full_name: string
+  email: string
+  phone: string
+  institution: string
+  designation: string
+  device_fingerprint: string
+  qr_token_used: string
+  lat: number
+  lng: number
+  location_label: string | null
+  mda?: string
+}
+
 function haversineDistance(
   lat1: number, lng1: number,
   lat2: number, lng2: number,
@@ -67,6 +83,14 @@ export async function POST(request: Request) {
     )
   }
 
+  const eventId = payload._token_type === 'session' ? payload.event_id : payload.id
+  if (!eventId) {
+    return NextResponse.json(
+      { error: 'This QR code is invalid or has expired.' },
+      { status: 403 },
+    )
+  }
+
   const eventLat = payload._token_type === 'session' ? payload.event_lat : payload.lat
   const eventLng = payload._token_type === 'session' ? payload.event_lng : payload.lng
 
@@ -83,7 +107,6 @@ export async function POST(request: Request) {
     }
   }
 
-  const eventId = payload._token_type === 'session' ? payload.event_id : payload.id
   const sessionId = payload._token_type === 'session' ? (payload.session_id ?? payload.id) : null
 
   const { data: existing } = await admin
@@ -116,7 +139,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const insertData: Record<string, any> = {
+  const insertData: AttendeeInsertData = {
     event_id:           eventId,
     session_id:         sessionId,
     full_name:          full_name.trim(),
