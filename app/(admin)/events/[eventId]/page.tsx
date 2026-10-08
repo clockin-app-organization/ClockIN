@@ -24,33 +24,33 @@ export default async function EventDetailPage({
   const { eventId } = await params;
   const supabase = await createClient();
 
-  await supabase.rpc('sync_event_statuses');
-
-  const { data: event } = await supabase
-    .from("events")
-    .select("*, sessions(*)")
-    .eq("id", eventId)
-    .single();
+  const [_, { data: event }, { data: attendees }, { data: revivalNotes }] =
+    await Promise.all([
+      supabase.rpc("sync_event_statuses"),
+      supabase
+        .from("events")
+        .select("*, sessions(*)")
+        .eq("id", eventId)
+        .single(),
+      supabase
+        .from("attendees")
+        .select("*")
+        .eq("event_id", eventId)
+        .is("session_id", null)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("revival_notes")
+        .select("*")
+        .eq("scope_type", "event")
+        .eq("scope_id", eventId)
+        .order("created_at", { ascending: false }),
+    ]);
 
   if (!event) notFound();
 
-  const { data: attendees } = await supabase
-    .from("attendees")
-    .select("*")
-    .eq("event_id", event.id)
-    .is("session_id", null)
-    .order("created_at", { ascending: false });
-
-  const { data: revivalNotes } = await supabase
-    .from("revival_notes")
-    .select("*")
-    .eq("scope_type", "event")
-    .eq("scope_id", eventId)
-    .order("created_at", { ascending: false });
-
   const safeAttendees: Attendee[] = attendees ?? [];
-  const safeNotes: RevivalNote[]  = revivalNotes ?? [];
-  const latestNote                = safeNotes[0] ?? null;
+  const safeNotes: RevivalNote[] = revivalNotes ?? [];
+  const latestNote = safeNotes[0] ?? null;
 
   // Session‑based stats
   let uniqueAttendeesCount = 0;

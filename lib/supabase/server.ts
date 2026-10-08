@@ -2,6 +2,7 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import type { Profile } from "@/lib/types";
 
 export async function createClient() {
@@ -29,8 +30,7 @@ export async function createClient() {
   );
 }
 
-
-export async function getUser() {
+export const getUser = cache(async () => {
   const supabase = await createClient();
 
   const {
@@ -43,18 +43,14 @@ export async function getUser() {
   }
 
   return user;
-}
+});
 
-
-export async function getProfile(): Promise<Profile | null> {
+export const getProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  const user = await getUser();
 
-  if (userError || !user) {
+  if (!user) {
     return null;
   }
 
@@ -69,4 +65,4 @@ export async function getProfile(): Promise<Profile | null> {
   }
 
   return data;
-}
+});

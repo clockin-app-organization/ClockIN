@@ -1,5 +1,5 @@
 // app/(admin)/users/page.tsx
-import { createClient, getUser } from "@/lib/supabase/server";
+import { createClient, getProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -10,27 +10,18 @@ import ThemeToggle from "@/components/ui/ThemeToggle";
 export const revalidate = 0;
 
 export default async function UsersPage() {
-  const user = await getUser();
-  if (!user) return
+  const me = await getProfile();
+  if (!me?.is_super_admin) redirect("/dashboard");
 
   const supabase = await createClient();
 
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("is_super_admin")
-    .eq("id", user.id)
-    .single();
-
-  if (!me?.is_super_admin) redirect("/dashboard");
-
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  const { data: mdas } = await supabase
-    .from("mdas")
-    .select("id, name");
+  const [{ data: profiles }, { data: mdas }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false }),
+    supabase.from("mdas").select("id, name"),
+  ]);
 
   const mdaNameById = (mdas ?? []).reduce<Record<string, string>>(
     (acc, m) => { acc[m.id] = m.name; return acc; },

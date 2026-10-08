@@ -1,9 +1,6 @@
 // app/(admin)/dashboard/page.tsx
-import { createClient, getUser } from "@/lib/supabase/server";
-import Link from "next/link";
-import { Calendar, Radio, CheckCircle2, Archive, Plus } from "lucide-react";
+import { createClient, getProfile } from "@/lib/supabase/server";
 import type { DashboardStats, Event } from "@/lib/types";
-import MonthlyAttendeesChart from "@/components/analytics/MonthlyAttendeesChart";
 import DashboardUI from "@/components/pages/dashboard/DashboardUI";
 
 export const revalidate = 30;
@@ -16,22 +13,15 @@ type RecentEvent = Pick<
 >;
 
 export default async function DashboardPage() {
-  const user = await getUser();
+  const profile = await getProfile();
 
-  if (!user) {
+  if (!profile) {
     return null;
   }
 
   const supabase = await createClient();
-  const userId = user.id;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_super_admin")
-    .eq("id", userId)
-    .single();
-
-  const isSuperAdmin = profile?.is_super_admin ?? false;
+  const userId = profile.id;
+  const isSuperAdmin = profile.is_super_admin ?? false;
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -119,33 +109,6 @@ export default async function DashboardPage() {
     pastEvents = past ?? 0;
     recentEvents = events as RecentEvent[] | null;
   }
-
-  const statCards = [
-    {
-      label: "Total Daily Events",
-      value: stats.total_events,
-      icon: Calendar,
-      color: "text-blue-600 bg-blue-50",
-    },
-    {
-      label: "Active sessions",
-      value: stats.active_sessions,
-      icon: Radio,
-      color: "text-green-600 bg-green-50",
-    },
-    {
-      label: "Total Daily Attendees",
-      value: stats.total_checkins,
-      icon: CheckCircle2,
-      color: "text-indigo-600 bg-indigo-50",
-    },
-    {
-      label: "Total Past Events",
-      value: pastEvents,
-      icon: Archive,
-      color: "text-amber-600 bg-amber-50",
-    },
-  ];
 
   return (
     <DashboardUI

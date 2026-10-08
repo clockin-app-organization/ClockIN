@@ -1,5 +1,5 @@
 // app/(admin)/mdas/page.tsx
-import { createClient, getUser } from "@/lib/supabase/server";
+import { createClient, getProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus, Building2 } from "lucide-react";
@@ -10,18 +10,10 @@ import ThemeToggle from "@/components/ui/ThemeToggle";
 export const revalidate = 0;
 
 export default async function MdasPage() {
-  const user = await getUser();
-  if (!user) return
+  const me = await getProfile();
+  if (!me?.is_super_admin) redirect("/dashboard");
 
   const supabase = await createClient();
-
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("is_super_admin")
-    .eq("id", user.id)
-    .single();
-
-  if (!me?.is_super_admin) redirect("/dashboard");
 
   const { data: mdas } = await supabase
     .from("mdas")

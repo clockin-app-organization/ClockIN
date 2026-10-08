@@ -65,7 +65,11 @@ export async function GET() {
     return { month, count: monthlyMap.get(key) ?? 0 }
   })
 
-  return NextResponse.json(result)
+  return NextResponse.json(result, {
+    headers: {
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+    },
+  })
 }
 
 function generateEmptyMonths(year: number) {

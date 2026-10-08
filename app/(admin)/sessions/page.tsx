@@ -90,6 +90,7 @@ function SessionGroup({
             <Link
               key={s.id}
               href={`/events/${s.event_id}/sessions/${s.id}`}
+              prefetch={false}
               className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50"
             >
               <div className="min-w-0 flex-1">

@@ -1,6 +1,4 @@
-// app/(admin)/events/page.tsx
-// Regular admins only see their own events; super admins see all.
-import { createClient, getUser } from "@/lib/supabase/server";
+import { createClient, getProfile } from "@/lib/supabase/server";
 import EventsUI from "@/components/pages/event/EventsUI";
 
 export const revalidate = 0;
@@ -25,21 +23,14 @@ type SessionRow = {
 };
 
 export default async function EventsPage() {
-  const user = await getUser();
+  const profile = await getProfile();
 
-  if (!user) return;
+  if (!profile) return;
   const supabase = await createClient();
 
   await supabase.rpc("sync_event_statuses");
 
-  // Check if current user is super admin
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_super_admin")
-    .eq("id", user.id)
-    .single();
-
-  const isSuperAdmin = profile?.is_super_admin ?? false;
+  const isSuperAdmin = profile.is_super_admin ?? false;
 
   // Super admins see all events; regular admins only see their own
   let eventQuery = supabase
@@ -48,7 +39,7 @@ export default async function EventsPage() {
     .order("event_date", { ascending: false });
 
   if (!isSuperAdmin) {
-    eventQuery = eventQuery.eq("created_by", user.id);
+    eventQuery = eventQuery.eq("created_by", profile.id);
   }
 
   // Sessions scoped to the same events
@@ -61,7 +52,7 @@ export default async function EventsPage() {
     const { data: userEvents } = await supabase
       .from("events")
       .select("id")
-      .eq("created_by", user.id);
+      .eq("created_by", profile.id);
 
     const eventIds = userEvents?.map((e) => e.id) ?? [];
     if (eventIds.length === 0) {

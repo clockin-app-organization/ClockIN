@@ -1,11 +1,7 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import Script from 'next/script';
-import 'leaflet/dist/leaflet.css';
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "Smart Attendance",
@@ -40,11 +36,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <Script id="theme-init" strategy="beforeInteractive">
-          {`try{const s=localStorage.getItem('theme');const p=typeof window!=='undefined'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;if(s==='dark'||(!s&&p)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}`}
+          {`try{const s=localStorage.getItem('theme');const p=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;const dark=s==='dark'||(!s&&p);const root=document.documentElement;root.classList.toggle('dark',dark);if(location.pathname.startsWith('/attend/'))root.style.backgroundColor=dark?'#0f172a':'#f9fafb'}catch(e){}`}
         </Script>
       </head>
       <body className="bg-gray-50 antialiased">{children}</body>
