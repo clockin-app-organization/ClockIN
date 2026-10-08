@@ -27,13 +27,18 @@ export default function AttendClient({
   eventData,
   maxDistance,
 }: AttendClientProps) {
+  const eventLat = eventData._token_type === 'session' ? eventData.event_lat : eventData.lat
+  const eventLng = eventData._token_type === 'session' ? eventData.event_lng : eventData.lng
+  const eventCoords = eventLat != null && eventLng != null ? { lat: eventLat, lng: eventLng } : null
+  const hasEventLocation = eventCoords !== null
+
   const [pageState,   setPageState]   = useState<'form' | 'success' | 'error'>('form')
   const [fatalError,  setFatalError]  = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting,  setSubmitting]  = useState(false)
   const [location,    setLocation]    = useState<{ lat: number; lng: number } | null>(null)
   const [locLabel,    setLocLabel]    = useState('')
-  const [locState,    setLocState]    = useState<LocState>('requesting')
+  const [locState,    setLocState]    = useState<LocState>(hasEventLocation ? 'requesting' : 'granted')
   const locStarted = useRef(false)
 
   const [form, setForm] = useState({
@@ -128,7 +133,7 @@ export default function AttendClient({
   }
 
   useEffect(() => {
-    if (!locStarted.current) {
+    if (hasEventLocation && !locStarted.current) {
       locStarted.current = true
       startLocationRequest()
     }
@@ -164,32 +169,28 @@ export default function AttendClient({
     }
   }, [eventData])
 
-  const eventLat = eventData._token_type === 'session' ? eventData.event_lat : eventData.lat
-  const eventLng = eventData._token_type === 'session' ? eventData.event_lng : eventData.lng
-  const eventCoords = eventLat != null && eventLng != null ? { lat: eventLat, lng: eventLng } : null
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs: Record<string, string> = {}
 
-    if (!location) {
-      errs.location = locState === 'denied'
-        ? 'Location access was denied. Enable it in your browser settings and tap Retry.'
-        : 'Still fetching your location — please wait a moment.'
-    }
-
-    if (location && eventCoords) {
-      const distance = haversineDistance(
-        location.lat,
-        location.lng,
-        eventCoords.lat,
-        eventCoords.lng
-      )
-      const MAX_DISTANCE = maxDistance
-      if (distance > MAX_DISTANCE) {
-        errs.location = `You are too far from the event location (${distance.toFixed(0)}m away). Please move closer.`
-        setFieldErrors(errs)
-        return
+    if (hasEventLocation) {
+      if (!location) {
+        errs.location = locState === 'denied'
+          ? 'Location access was denied. Enable it in your browser settings and tap Retry.'
+          : 'Still fetching your location — please wait a moment.'
+      } else if (eventCoords) {
+        const distance = haversineDistance(
+          location.lat,
+          location.lng,
+          eventCoords.lat,
+          eventCoords.lng
+        )
+        const MAX_DISTANCE = maxDistance
+        if (distance > MAX_DISTANCE) {
+          errs.location = `You are too far from the event location (${distance.toFixed(0)}m away). Please move closer.`
+          setFieldErrors(errs)
+          return
+        }
       }
     }
 
@@ -228,9 +229,9 @@ export default function AttendClient({
         mda:                isMda ? form.mda.trim() || null : null,
         designation:        form.designation.trim(),
         device_fingerprint: getOrCreateDeviceId(),
-        lat:                location!.lat,
-        lng:                location!.lng,
-        location_label:     locLabel || null,
+        lat:                hasEventLocation && location ? location.lat : null,
+        lng:                hasEventLocation && location ? location.lng : null,
+        location_label:     hasEventLocation ? (locLabel || null) : null,
       }),
     }).catch(() => null)
 
@@ -312,13 +313,13 @@ export default function AttendClient({
             </div>
           </div>
 
-          {locState === 'requesting' && (
+          {hasEventLocation && locState === 'requesting' && (
             <div className="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
               <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
               Requesting your location — please allow when prompted.
             </div>
           )}
-          {locState === 'granted' && location && (
+          {hasEventLocation && locState === 'granted' && location && (
             <div className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-xs text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-200">
               <MapPin className="h-4 w-4 flex-shrink-0 text-green-600 dark:text-green-400" />
               <span className="min-w-0 truncate">
@@ -326,7 +327,7 @@ export default function AttendClient({
               </span>
             </div>
           )}
-          {(locState === 'denied' || locState === 'unsupported') && (
+          {hasEventLocation && (locState === 'denied' || locState === 'unsupported') && (
             <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 text-xs text-red-800 space-y-2 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-red-600" />
@@ -556,12 +557,12 @@ export default function AttendClient({
 
             <button
               type="submit"
-              disabled={submitting || locState === 'requesting'}
+              disabled={submitting || (hasEventLocation && locState === 'requesting')}
               className="btn-primary w-full disabled:opacity-60"
             >
               {submitting
                 ? <Loader2 className="h-4 w-4 animate-spin" />
-                : locState === 'requesting'
+                : hasEventLocation && locState === 'requesting'
                 ? 'Waiting for location…'
                 : 'Check In'
               }
