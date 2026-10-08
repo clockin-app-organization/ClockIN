@@ -8,7 +8,7 @@ type AttendeeInsertData = {
   event_id: string
   session_id: string | null
   full_name: string
-  email: string
+  email: string | null
   phone: string
   institution: string
   designation: string
@@ -56,8 +56,8 @@ export async function POST(request: Request) {
     location_label,
   } = body
 
-  if (!full_name?.trim() || !email?.trim() || !phone?.trim()) {
-    return NextResponse.json({ error: 'Name, email, and phone are required.' }, { status: 400 })
+  if (!full_name?.trim() || !phone?.trim()) {
+    return NextResponse.json({ error: 'Name and phone are required.' }, { status: 400 })
   }
   if (!institution?.trim()) {
     return NextResponse.json({ error: 'Institution is required.' }, { status: 400 })
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
     event_id:           eventId,
     session_id:         sessionId,
     full_name:          full_name.trim(),
-    email:              email.trim(),
+    email:              email?.trim() || null,
     phone:              phone.trim(),
     institution:        institution.trim(),
     designation:        designation.trim(),

@@ -222,7 +222,7 @@ export default function AttendClient({
       body: JSON.stringify({
         token,
         full_name:          form.full_name.trim(),
-        email:              form.email.trim(),
+        email:              form.email.trim() || null,
         phone:              form.phone.trim(),
         institution:        form.institution.trim(),
         mda:                isMda ? form.mda.trim() || null : null,
@@ -371,7 +371,7 @@ export default function AttendClient({
             <div>
               <input
                 type="email" name="email" autoComplete="email"
-                placeholder="Email address *"
+                placeholder="Email address (optional)"
                 value={form.email}
                 onChange={e => {
                   const v = e.target.value
@@ -379,7 +379,6 @@ export default function AttendClient({
                   if (fieldErrors.email) setFieldErrors(p => { const c = { ...p }; delete c.email; return c })
                 }}
                 className={`input-base ${fieldErrors.email ? 'border-red-300 focus:border-red-400' : ''}`}
-                required
               />
               {fieldErrors.email && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{fieldErrors.email}</p>}
             </div>
