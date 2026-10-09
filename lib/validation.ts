@@ -13,7 +13,7 @@ export interface FormErrors {
 
 export function validateAttendanceForm(data: {
   full_name:    string;
-  email:        string;
+  email?:       string;
   phone:        string;
   institution?: string;
   designation?: string;
@@ -26,9 +26,7 @@ export function validateAttendanceForm(data: {
     errors.full_name = 'Full name must be 32 characters or less.';
   }
 
-  if (!data.email.trim()) {
-    errors.email = 'Email is required.';
-  } else {
+  if (data.email?.trim()) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
     if (!emailRegex.test(data.email.trim())) {
       errors.email = 'Enter a valid email address.';

@@ -131,14 +131,13 @@ export default function ManualAttendanceUpload({
 
     const baseLocation = manualForm.location.trim() || eventDetails.location.trim() || 'Event Location';
 
-    const { error } = await supabase.from('attendees').insert({
+    const insertData: Record<string, any> = {
       event_id: eventId,
       session_id: sessionId || null,
       full_name: manualForm.full_name.trim(),
-      email: manualForm.email.trim(),
+      email: manualForm.email.trim() || null,
       phone: manualForm.phone.trim(),
       institution: manualForm.institution.trim(),
-      mda: manualForm.mda.trim() || null,
       designation: manualForm.designation.trim(),
       device_fingerprint: `manual-admin-input-${Date.now()}`,
       qr_token_used: null,
@@ -146,7 +145,19 @@ export default function ManualAttendanceUpload({
       lng: eventDetails.lng ?? null,
       location_label: baseLocation,
       method: 'manual',
-    });
+    };
+
+    if (manualForm.mda.trim()) {
+      insertData.mda = manualForm.mda.trim();
+    }
+
+    let { error } = await supabase.from('attendees').insert(insertData);
+
+    if (error && insertData.mda && (error.message.includes('mda') || error.message.includes('schema cache'))) {
+      delete insertData.mda;
+      const retry = await supabase.from('attendees').insert(insertData);
+      error = retry.error;
+    }
 
     setManualSaving(false);
     if (error) {

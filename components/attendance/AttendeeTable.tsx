@@ -112,18 +112,32 @@ export default function AttendeeTable({ attendees, revivalAt }: Props) {
     setActionError('')
 
     const locationLabel = editForm.location.trim() || 'Event Location'
-    const { error } = await supabase
+    const updateData: Record<string, any> = {
+      full_name:       editForm.full_name.trim(),
+      phone:           editForm.phone.trim(),
+      email:           editForm.email.trim() || null,
+      institution:     editForm.institution.trim(),
+      designation:     editForm.designation.trim(),
+      location_label:  locationLabel,
+    }
+
+    if (editForm.mda.trim()) {
+      updateData.mda = editForm.mda.trim()
+    }
+
+    let { error } = await supabase
       .from('attendees')
-      .update({
-        full_name:       editForm.full_name.trim(),
-        phone:           editForm.phone.trim(),
-        email:           editForm.email.trim(),
-        institution:     editForm.institution.trim(),
-        mda:             editForm.mda.trim() || null,
-        designation:     editForm.designation.trim(),
-        location_label:  locationLabel,
-      })
+      .update(updateData)
       .eq('id', selected.id)
+
+    if (error && updateData.mda && (error.message.includes('mda') || error.message.includes('schema cache'))) {
+      delete updateData.mda
+      const retry = await supabase
+        .from('attendees')
+        .update(updateData)
+        .eq('id', selected.id)
+      error = retry.error
+    }
 
     setSaving(false)
     if (error) {

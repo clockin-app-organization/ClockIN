@@ -8,14 +8,14 @@ type AttendeeInsertData = {
   event_id: string
   session_id: string | null
   full_name: string
-  email: string
+  email: string | null
   phone: string
   institution: string
   designation: string
   device_fingerprint: string
   qr_token_used: string
-  lat: number
-  lng: number
+  lat: number | null
+  lng: number | null
   location_label: string | null
   mda?: string
 }
@@ -56,17 +56,14 @@ export async function POST(request: Request) {
     location_label,
   } = body
 
-  if (!full_name?.trim() || !email?.trim() || !phone?.trim()) {
-    return NextResponse.json({ error: 'Name, email, and phone are required.' }, { status: 400 })
+  if (!full_name?.trim() || !phone?.trim()) {
+    return NextResponse.json({ error: 'Name and phone are required.' }, { status: 400 })
   }
   if (!institution?.trim()) {
     return NextResponse.json({ error: 'Institution is required.' }, { status: 400 })
   }
   if (!designation?.trim()) {
     return NextResponse.json({ error: 'Designation is required.' }, { status: 400 })
-  }
-  if (typeof lat !== 'number' || typeof lng !== 'number') {
-    return NextResponse.json({ error: 'Location coordinates are required.' }, { status: 400 })
   }
   if (!device_fingerprint) {
     return NextResponse.json({ error: 'Device fingerprint is required.' }, { status: 400 })
@@ -93,8 +90,13 @@ export async function POST(request: Request) {
 
   const eventLat = payload._token_type === 'session' ? payload.event_lat : payload.lat
   const eventLng = payload._token_type === 'session' ? payload.event_lng : payload.lng
+  const hasEventLocation = eventLat != null && eventLng != null
 
-  if (eventLat != null && eventLng != null) {
+  if (hasEventLocation) {
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      return NextResponse.json({ error: 'Location coordinates are required.' }, { status: 400 })
+    }
+
     const parsed = Number(process.env.GEOFENCE_MAX_DISTANCE)
     const maxDistance = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_DISTANCE
 
@@ -143,15 +145,15 @@ export async function POST(request: Request) {
     event_id:           eventId,
     session_id:         sessionId,
     full_name:          full_name.trim(),
-    email:              email.trim(),
+    email:              email?.trim() || null,
     phone:              phone.trim(),
     institution:        institution.trim(),
     designation:        designation.trim(),
     device_fingerprint,
     qr_token_used:      token,
-    lat,
-    lng,
-    location_label:     location_label || null,
+    lat:                hasEventLocation && typeof lat === 'number' ? lat : null,
+    lng:                hasEventLocation && typeof lng === 'number' ? lng : null,
+    location_label:     hasEventLocation ? (location_label || null) : null,
   }
 
   const trimmedMda = mda?.trim()
